@@ -4,23 +4,11 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { supabase } from './dbClient.js';
-import { generateTransaction } from './synthetic_generator.js';
+// import { generateTransaction } from './synthetic_generator.js';
 import { v4 as uuidv4 } from 'uuid';
-import { evaluateTransaction } from './lib/ruleEngine.js';
 import rulesRouter from './routes/rules.js';
 import { runFraudCheckAndPersist } from './lib/fraudEngineWrapper.js';
-
-const requiredEnvVars = [
-  'SUPABASE_URL',
-  'SUPABASE_ANON_KEY'
-];
-
-const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
-
-if (missingEnvVars.length > 0) {
-  console.error('❌ Missing required environment variables:', missingEnvVars);
-  process.exit(1);
-}
+import { generateTransaction } from './generateTransaction.js';
 
 const app = express();
 app.use(cors());
@@ -32,24 +20,63 @@ let userPool = [], userMap = {};
 
 (async () => {
   try {
-    const { data: users, error: usersError } = await supabase
-      .from('users').select('user_id,name');
+    const { data: users, error } = await supabase
+      .from('users')
+      .select('user_id, name');
 
-    if (usersError) throw new Error(`Fetch users: ${usersError.message}`);
+    if (error) throw new Error(error.message);
 
     users.forEach(u => {
       userPool.push(u.user_id);
       userMap[u.user_id] = u.name;
     });
 
+    console.log('✅ Users loaded');
   } catch (err) {
-    console.error('❌ Fatal init error:', err);
+    console.error('❌ Startup error:', err);
     process.exit(1);
   }
 })();
 
-app.get('/rules/test', (req, res) => {
-  res.sendFile(path.join(process.cwd(), 'public/debug.html'));
+// Real-time streaming via SSE
+app.get('/stream', (req, res) => {
+  res.set({
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive'
+  });
+
+  const interval = setInterval(async () => {
+    try {
+      const txn = generateTransaction(userPool);
+      txn.txn_id = uuidv4(); // ensure no collisions
+      txn.timestamp = new Date().toISOString();
+
+      await runFraudCheckAndPersist(txn);
+
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*, users(name)')
+        .eq('txn_id', txn.txn_id)
+        .single();
+
+      if (error) throw error;
+
+      const enrichedTxn = {
+        ...data,
+        user_name: data.users?.name ?? 'N/A'
+      };
+
+      res.write(`data: ${JSON.stringify(enrichedTxn)}\n\n`);
+    } catch (err) {
+      console.error('⚠️ Stream processing error:', err.message);
+    }
+  }, 1000);
+
+  req.on('close', () => {
+    clearInterval(interval);
+    res.end();
+  });
 });
 
 app.post('/api/eval', async (req, res) => {
@@ -66,9 +93,9 @@ app.post('/api/eval', async (req, res) => {
       });
     }
 
-    if (typeof txn.user_id !== 'string' || 
-        typeof txn.agent_id !== 'string' || 
-        typeof txn.amount !== 'number' || 
+    if (typeof txn.user_id !== 'string' ||
+        typeof txn.agent_id !== 'string' ||
+        typeof txn.amount !== 'number' ||
         typeof txn.currency !== 'string') {
       return res.status(400).json({
         error: 'Invalid field types',
@@ -85,12 +112,33 @@ app.post('/api/eval', async (req, res) => {
       return res.status(400).json({ error: 'Amount must be positive' });
     }
 
-    const result = await runFraudCheckAndPersist(txn);
-    res.json(result);
+    txn.txn_id = uuidv4();
+    txn.timestamp = new Date().toISOString();
+
+    await runFraudCheckAndPersist(txn);
+
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('*, users(name)')
+      .eq('txn_id', txn.txn_id)
+      .single();
+
+    if (error) throw error;
+
+    res.json({
+      ...data,
+      user_name: data.users?.name ?? 'N/A'
+    });
+
   } catch (err) {
     console.error('❌ Eval error:', err.message);
     res.status(500).json({ error: err.message });
   }
+});
+
+// Optional: leave this or remove if not used
+app.get('/rules/test', (req, res) => {
+  res.sendFile(path.join(process.cwd(), 'public/debug.html'));
 });
 
 app.post('/api/rules', async (req, res) => {
@@ -157,12 +205,10 @@ const shutdown = async (signal) => {
 
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
-
 process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error);
   shutdown('UNCAUGHT_EXCEPTION');
 });
-
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
   shutdown('UNHANDLED_REJECTION');

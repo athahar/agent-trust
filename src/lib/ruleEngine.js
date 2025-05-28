@@ -63,7 +63,18 @@ export async function evaluateTransaction(txn) {
     });
 
     if (passed) {
-      console.log(`✅ Rule matched: ${rule.rule_name || rule.rule}`);
+      console.log(
+        `✅ Rule matched: ${rule.rule_name || rule.rule}, txn:`,
+        {
+          txn_id: txn.txn_id,
+          user_id: txn.user_id,
+          agent_id: txn.agent_id,
+          partner: txn.partner,
+          amount: txn.amount,
+          intent: txn.intent,
+          timestamp: txn.timestamp
+        }
+      );
       triggered.push({
         rule: rule.rule_name || rule.rule,
         decision: rule.action || rule.decision,

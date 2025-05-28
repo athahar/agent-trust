@@ -70,8 +70,8 @@
       <h1>Live Transaction Dashboard</h1>
       <nav>
         <a href="index.html">Dashboard</a>
-        <a href="logs.html">Raw Logs</a>
         <a href="user.html">User Lookup</a>
+        <a href="rules.html">Rules</a>
       </nav>
     </header>
     <table>
@@ -94,26 +94,6 @@
     </table>
   </div>
   <script>
-    async function simulateTxn() {
-      const resp = await fetch('/api/eval', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: 'demo-user-001',
-          agent_id: 'agent-123',
-          amount: Math.floor(Math.random() * 100) + 1,
-          currency: 'USD',
-          partner: 'Stripe',
-          seller_name: 'Demo Seller',
-          intent: 'checkout',
-          checkout_time_seconds: Math.floor(Math.random() * 60),
-          account_age_days: Math.floor(Math.random() * 30)
-        })
-      });
-      const txn = await resp.json();
-      addTxnToTable(txn);
-    }
-
     function addTxnToTable(t) {
       const tbl = document.getElementById('tbl');
       const tr = document.createElement('tr');
@@ -125,7 +105,7 @@
         <td>${(t.agent_id || '').slice(0,8)}</td>
         <td>${t.partner || '—'}</td>
         <td>${t.seller_name || '—'}</td>
-        <td>$${t.amount.toFixed(2)}</td>
+        <td>$${(t.amount || 0).toFixed(2)}</td>
         <td>${(t.intent || '').replace('_',' ')}</td>
         <td>${t.fraud_engine_output?.risk_decision || '—'}</td>
         <td>${t.flagged?'⚠️':''}${t.to_review?'🕵️':''}${t.declined?'❌':''}${t.disputed?'💔':''}</td>
@@ -134,9 +114,15 @@
       if (tbl.children.length > 50) tbl.removeChild(tbl.lastChild);
     }
 
-    // Initial load
-    for (let i = 0; i < 10; i++) simulateTxn();
-    setInterval(simulateTxn, 7000); // every 7 seconds
+    const stream = new EventSource('/stream');
+    stream.onmessage = (event) => {
+      try {
+        const txn = JSON.parse(event.data);
+        addTxnToTable(txn);
+      } catch (err) {
+        console.error('Parse error:', err);
+      }
+    };
   </script>
 </body>
 </html>
