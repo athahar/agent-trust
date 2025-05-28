@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Raw Transaction Logs</title>
+  <style>
+    :root {
+      --primary: #5c6ac4;
+      --bg: #f4f5f7;
+      --text: #1f2937;
+      --card-bg: #ffffff;
+      --card-shadow: rgba(0,0,0,0.1);
+    }
+    body {
+      margin: 0;
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 1rem;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 1rem;
+    }
+    nav a {
+      margin-right: 1rem;
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 500;
+    }
+    nav a:last-child { margin-right:0; }
+    h1 { margin: 0; font-size: 1.5rem; }
+    .logs {
+      background: var(--card-bg);
+      box-shadow: 0 2px 4px var(--card-shadow);
+      border-radius: 8px;
+      padding: 1rem;
+      max-height: 70vh;
+      overflow-y: auto;
+      font-family: monospace;
+      line-height: 1.4;
+    }
+    .logs li + li { margin-top: 0.5rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Raw Transaction Logs</h1>
+      <nav>
+        <a href="index.html">Dashboard</a>
+        <a href="user.html">User Lookup</a>
+      </nav>
+    </header>
+    <ul id="logs" class="logs"></ul>
+  </div>
+  <script>
+    const es = new EventSource('/stream'),
+          ul = document.getElementById('logs');
+    es.onmessage = e => {
+      const li = document.createElement('li');
+      li.textContent = JSON.stringify(JSON.parse(e.data));
+      ul.prepend(li);
+      if (ul.children.length > 100) ul.removeChild(ul.lastChild);
+    };
+  </script>
+</body>
+</html>

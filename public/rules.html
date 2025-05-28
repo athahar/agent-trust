@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fraud Rule Manager</title>
+</head>
+<body>
+  <h1>Fraud Rules Dashboard</h1>
+
+  <form id="ruleForm">
+    <input name="rule_name" placeholder="Rule Name" required />
+    <input name="condition" placeholder="Condition" required />
+    <input name="action" placeholder="Action" required />
+    <input name="priority" type="number" placeholder="Priority" required />
+    <input name="classification" placeholder="Classification (default: AI Agent Fraud)" />
+    <label>
+      <input name="enabled" type="checkbox" checked /> Enabled
+    </label>
+    <button type="submit">Add Rule</button>
+  </form>
+
+  <hr />
+  <h2>Existing Rules</h2>
+  <ul id="rulesList"></ul>
+
+  <script>
+    async function loadRules() {
+      const res = await fetch('/rules');
+      const rules = await res.json();
+      const list = document.getElementById('rulesList');
+      list.innerHTML = '';
+      rules.forEach(rule => {
+        const li = document.createElement('li');
+        li.textContent = `[${rule.priority}] ${rule.rule_name} - ${rule.condition} -> ${rule.action}`;
+        list.appendChild(li);
+      });
+    }
+
+    document.getElementById('ruleForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = new FormData(e.target);
+      const body = {};
+      form.forEach((v, k) => body[k] = v);
+      body.enabled = form.get('enabled') === 'on';
+
+      const res = await fetch('/rules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      if (res.ok) {
+        e.target.reset();
+        loadRules();
+      } else {
+        alert('Error adding rule');
+      }
+    });
+
+    loadRules();
+  </script>
+</body>
+</html>

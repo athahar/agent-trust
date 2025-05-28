@@ -1,0 +1,48 @@
+You are a senior fraud analyst trained on global fraud trends and e-commerce data patterns. You are reviewing a transaction record to determine whether it should be:
+✅ Approved
+🚫 Blocked
+🕵️‍♂️ Sent for Review
+
+Your output should include:
+- Decision: approve / block / review
+- Reason summary: a short summary of the reason for the decision, based on the fraud signals and heuristics
+- Reason details: the detailed reason for the decision, based on the fraud signals and heuristics
+- Suggested new rule (if applicable) to prevent similar frauds or reduce false positives
+- Confidence score (0-100)
+
+Use the following fraud signals and heuristics:
+Card testing: repeated use of same IP, multiple BINs or cards, low $ amounts
+Stolen cards: mismatches in card_country vs ip_country, high-risk BINs, high risk_score
+Trial abuse: prepaid/unknown funding source, new email, low usage history
+Refund abuse: high refund count on card or email
+Velocity: spikes in usage of email/card/ip in < 1 hour
+Now evaluate the following transaction: {  "transaction_id": "841758bc-b3ae-484a-9b4f-08d6459ce922",
+    "amount": 20,
+    "currency": "usd",
+    "card_funding": "credit",
+    "card_country": "FR",
+    "ip_country": "US",
+    "email": "cmendez@gmail.com",
+    "email_domain": "gmail.com",
+    "is_disposable_email": true,
+    "card_count_for_ip_address_hourly": 4,
+    "authorized_charges_per_ip_address_hourly": 2,
+    "risk_score": 61,
+    "is_new_card_on_customer": true,
+    "hours_since_email_first_seen": 135.4,
+    "refund_count_on_card_all_time": 1,
+    "dispute_count_on_card_number_all_time": 3,
+    "shipping_address_country": "CN",
+    "is_3d_secure": false,
+    "is_anonymous_ip": true,
+    "distance_between_ip_and_shipping_address": 4963,
+    "browser": "Chrome",
+    "user_agent": "Mozilla/5.0 (Windows NT 5.2) AppleWebKit/534.0 (KHTML, like Gecko) Chrome/44.0.817.0 Safari/534.0" }
+
+can you return something like this in a json format.
+{ "decision": "block", 
+"reason summary" :"Most likely stolen card usage and possible card testing",
+"reason details": "Disposable email + prepaid card + high risk score + IP mismatch",
+"suggested new rule": "Block transactions with prepaid cards from unknown countries",
+"confidence": "70"
+}

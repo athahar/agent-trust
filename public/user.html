@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>User Detail</title>
+  <style>
+    :root {
+      --primary: #5c6ac4;
+      --bg: #f4f5f7;
+      --text: #1f2937;
+      --card-bg: #fff;
+      --card-shadow: rgba(0,0,0,0.1);
+      --orange: #f59e0b;
+      --red: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .container { max-width: 1000px; margin: 0 auto; padding: 1rem; }
+    h1 { font-size: 1.75rem; margin-bottom: 1rem; }
+    .overview {
+      background: var(--card-bg);
+      box-shadow: 0 2px 4px var(--card-shadow);
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+    .controls, .tabs { margin-bottom: 1rem; }
+    .controls button, .tabs button {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+      margin-right: 0.5rem;
+    }
+    .tabs button.active { background: #3730a3; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--card-bg);
+      box-shadow: 0 2px 4px var(--card-shadow);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    thead th {
+      background: var(--text);
+      color: #fff;
+      padding: 0.75rem 1rem;
+      text-align: left;
+    }
+    thead th:hover { background: var(--text); }
+    td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    tr:nth-child(even) { background: #f9fafb; }
+    tr:hover { background: #f1f5f9; }
+    a { color: var(--primary); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .flagged, .review { color: var(--orange); font-weight: 600; }
+    .declined, .disputed { color: var(--red); font-weight: 600; }
+
+    /* Generic modal */
+    .modal {
+      display: none;
+      position: fixed; top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5);
+      align-items: center; justify-content: center;
+      padding: 1rem;
+    }
+    .modal-content {
+        background: var(--card-bg);
+        width: 100%;
+        max-width: 90vw;    /* ← was 800px or 1000px */
+        max-height: 90%;
+        display: flex;
+        flex-direction: column;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .modal-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--bg);
+      background: var(--bg);
+    }
+    .back, .close {
+      cursor: pointer;
+      color: var(--primary);
+      text-decoration: none;
+      font-size: 0.9rem;
+    }
+    #modal-body, #simBody {
+      padding: 1rem; overflow-y: auto;
+    }
+    .fingerprint-table {
+      width: 100%; border-collapse: collapse; margin-top: 1rem;
+    }
+    .fingerprint-table th, .fingerprint-table td {
+      padding: 0.5rem; border: 1px solid var(--bg);
+    }
+    .fingerprint-table th {
+      background: var(--bg); color: var(--text);
+    }
+    label { display: block; margin: 0.5rem 0; }
+    select, input[type="number"] {
+      width: 100%; padding: 0.5rem; margin-top: 0.25rem;
+      border: 1px solid #ccc; border-radius: 4px;
+    }
+    button.primary {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+      margin-top: 1rem;
+      align-self: flex-end;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 id="page-title">User Detail</h1>
+    <div class="overview">
+      <strong>ID:</strong> <span id="uid"></span><br>
+      <strong>Name:</strong> <span id="uname"></span><br>
+      <strong>Trust Score:</strong> <span id="utrust">–</span>/100
+    </div>
+
+    <div class="controls">
+      <button id="openSim" class="primary">Simulate Transaction</button>
+    </div>
+
+    <div class="tabs">
+      <button data-period="30" class="active">30 d</button>
+      <button data-period="90">90 d</button>
+      <button data-period="365">1 y</button>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Partner</th><th>Txns</th><th>Total $</th><th>Score</th>
+          <th>Flagged</th><th>Review</th><th>Declined</th><th>Disputed</th><th>All</th>
+        </tr>
+      </thead>
+      <tbody id="stats"></tbody>
+    </table>
+  </div>
+
+  <!-- Agent‐details modal -->
+  <div id="modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span id="back" class="back">← Back</span>
+        <span id="close" class="close">× Close</span>
+      </div>
+      <div id="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Simulation modal -->
+  <div id="simModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="simTitle">Simulate a Transaction</h3>
+        <span id="simClose" class="close">× Close</span>
+      </div>
+      <div id="simBody">
+        <label>
+          Status:
+          <select id="simStatus">
+            <option value="good">Success</option>
+            <option value="flagged">Flagged</option>
+            <option value="review">To Be Reviewed</option>
+            <option value="declined">Declined</option>
+            <option value="disputed">Disputed</option>
+          </select>
+        </label>
+        <label>
+          Partner:
+          <select id="simPartner">
+            <option value="">Any</option>
+            <option>Ramp</option><option>Payman</option><option>Nekuda</option>
+            <option>New Gen</option><option>Scale</option><option>OpenAI</option>
+            <option>Anthropic</option><option>Samsung</option><option>Stripe</option>
+            <option>Shopify</option><option>Etsy</option><option>Booking.com</option>
+          </select>
+        </label>
+        <label>
+          Seller:
+          <select id="simSeller">
+            <option value="">Any</option>
+            <option>Best Buy</option><option>Canva</option><option>Khan Academy</option>
+            <option>Amazon</option><option>Walmart</option>
+          </select>
+        </label>
+        <label>
+          Delegation:
+          <select id="simDirect">
+            <option value="delegated">Delegated</option>
+            <option value="direct">Direct</option>
+          </select>
+        </label>
+        <label>
+          Delegated Hours Ago:
+          <input type="number" id="simHours" value="2" min="0" step="0.5"/>
+        </label>
+        <button id="doSim" class="primary">Run Simulation</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const qs         = new URLSearchParams(location.search);
+      const userId     = qs.get('userId');
+      const container  = document.querySelector('.container');
+      const pageTitle  = document.getElementById('page-title');
+      const uidEl      = document.getElementById('uid');
+      const nameEl     = document.getElementById('uname');
+      const trustEl    = document.getElementById('utrust');
+      const statsT     = document.getElementById('stats');
+      const tabs       = document.querySelectorAll('.tabs button');
+      const openSim    = document.getElementById('openSim');
+      const simModal   = document.getElementById('simModal');
+      const simClose   = document.getElementById('simClose');
+      const simTitle   = document.getElementById('simTitle');
+      const simBody    = document.getElementById('simBody');
+      const modal      = document.getElementById('modal');
+      const modalBody  = document.getElementById('modal-body');
+      const backBtn    = document.getElementById('back');
+      const closeBtn   = document.getElementById('close');
+
+      if (!userId) {
+        container.innerHTML = '<p>Please include <code>?userId=…</code> in the URL.</p>';
+        return;
+      }
+
+      let userName = '';
+      let currentPeriod = 30;
+      const originalSimHTML = simBody.innerHTML;
+
+      function formatDuration(ms) {
+        const sec  = Math.floor(ms/1000);
+        if (sec<60) return 'just now';
+        const min  = Math.floor(sec/60); if (min<60) return `${min}m ago`;
+        const hr   = Math.floor(min/60); if (hr<24) return `${hr}h ${min%60}m ago`;
+        const days = Math.floor(hr/24);  if (days<30) return `${days}d ${hr%24}h ago`;
+        const mo   = Math.floor(days/30);if (mo<12) return `${mo}mo ${days%30}d ago`;
+        const yr   = Math.floor(mo/12);  return `${yr}y ${mo%12}mo ago`;
+      }
+
+      async function loadSummary() {
+        const res = await fetch(`/user/${userId}/summary`);
+        const j   = await res.json();
+        pageTitle.textContent = j.name;
+        uidEl.textContent     = j.user_id;
+        nameEl.textContent    = j.name;
+        trustEl.textContent   = j.risk_profile;
+        userName               = j.name;
+        simTitle.textContent   = `Simulate a Transaction for User: ${j.name}`;
+      }
+
+      async function loadStats(days) {
+        statsT.innerHTML = '<tr><td colspan="9">Loading…</td></tr>';
+        const res  = await fetch(`/user/${userId}/agents?period=${days}`);
+        const data = await res.json();
+        console.log('⎘ agent_summary returned:', data);
+        statsT.innerHTML = data.map(a => `
+          <tr>
+            <td>${a.partner}</td>
+            <td>${a.txn_count}</td>
+            <td>$${a.total_amount.toFixed(2)}</td>
+            <td>${a.agent_score}</td>
+            <td class="flagged">${a.flagged_count||''}</td>
+            <td class="review">${a.to_review_count||''}</td>
+            <td class="declined">${a.declined_count||''}</td>
+            <td class="disputed">${a.disputed_count||''}</td>
+            <td><a href="#" data-agent="${a.agent_id}" data-partner="${a.partner}">View</a></td>
+          </tr>
+        `).join('');
+        document.querySelectorAll('a[data-agent]').forEach(link => {
+          link.addEventListener('click', e => {
+            e.preventDefault();
+            showAgentTxns(link.dataset.agent, link.dataset.partner);
+          });
+        });
+      }
+
+      async function showAgentTxns(agentId, partner) {
+        // log for debugging
+        console.log('→ showAgentTxns for', agentId, partner);
+
+        // initial header + table shell
+        modalBody.innerHTML = `
+            <h3>User: ${userName}, Partner: ${partner}</h3>
+            <table class="fingerprint-table">
+            <thead>
+                <tr>
+                <th>Date</th>
+                <th>Txn ID</th>
+                <th>$</th>
+                <th>Seller</th>
+                <th>Intent</th>
+                <th>Flagged</th>
+                <th>Review</th>
+                <th>Declined</th>
+                <th>Disputed</th>
+                <th>Delegated</th>
+                <th>Details</th>
+                </tr>
+            </thead>
+            <tbody id="txn-list"></tbody>
+            </table>`;
+
+        const listEl = document.getElementById('txn-list');
+
+        // fetch ALL transactions for this user
+        const resp = await fetch(`/simulate/${userId}`);
+        const allTxns = await resp.json();
+        console.log('⎘ allTxns:', allTxns);
+
+        // filter to just this agent
+        const txns = allTxns.filter(t => t.agent_id === agentId);
+        console.log(`⎘ filtered to ${agentId}:`, txns);
+
+        // render each row
+        listEl.innerHTML = txns.map(t => {
+            // show full date+time in first column
+            const fullDate = new Date(t.timestamp).toLocaleString();
+            // delegated delta
+            const ago = formatDuration(new Date(t.timestamp) - new Date(t.delegation_time));
+            return `
+            <tr>
+                <td>${fullDate}</td>
+                <td>${t.txn_id.slice(0,8)}</td>
+                <td>$${t.amount.toFixed(2)}</td>
+                <td>${t.seller_name || '—'}</td>
+                <td>${t.intent.replace('_',' ')}</td>
+                <td class="flagged">${t.flagged?1:''}</td>
+                <td class="review">${t.to_review?1:''}</td>
+                <td class="declined">${t.declined?1:''}</td>
+                <td class="disputed">${t.disputed?1:''}</td>
+                <td>${ago}</td>
+                <td><a href="#" data-txn="${t.txn_id}">Details</a></td>
+            </tr>`;
+        }).join('');
+
+        // hook up the “Details” links
+        listEl.querySelectorAll('a[data-txn]').forEach(link => {
+            link.addEventListener('click', async e => {
+            e.preventDefault();
+            const txnId = link.dataset.txn;
+            const txns2 = await (await fetch(`/simulate/${userId}`)).json();
+            const t     = txns2.find(x=>x.txn_id===txnId);
+            const ago   = formatDuration(new Date(t.timestamp) - new Date(t.delegation_time));
+            modalBody.innerHTML = `
+                <h3>Fingerprint for Txn ${txnId.slice(0,8)}</h3>
+                <ul>
+                <li><strong>Seller:</strong> ${t.seller_name}</li>
+                <li><strong>URL:</strong> <a href="${t.seller_url}" target="_blank">${t.seller_url}</a></li>
+                <li><strong>Date & Time:</strong> ${new Date(t.timestamp).toLocaleString()}</li>
+                <li><strong>Delegated At:</strong> ${new Date(t.delegation_time).toLocaleString()}</li>
+                <li><strong>Delegated?</strong> ${t.delegated ? 'Yes' : 'No'}</li>
+                <li><strong>Delegated Delta:</strong> ${ago}</li>
+                <li><strong>Device:</strong> ${t.device}</li>
+                </ul>
+                <p style="margin-top:1rem;"><a class="back" href="#">← Back to list</a></p>`;
+            modalBody.querySelector('.back').onclick = () => showAgentTxns(agentId, partner);
+            });
+        });
+
+        // hide modal on back
+        backBtn.onclick = () => {
+            modal.style.display = 'none';
+            loadStats(currentPeriod);
+        };
+
+        modal.style.display = 'flex';
+        }
+
+      openSim.addEventListener('click', () => {
+        simBody.innerHTML = originalSimHTML;
+        simModal.style.display = 'flex';
+        bindSimForm();
+      });
+      simClose.addEventListener('click', () => simModal.style.display = 'none');
+
+      function bindSimForm() {
+        const runBtn = document.getElementById('doSim');
+        runBtn.addEventListener('click', async () => {
+          const status  = document.getElementById('simStatus').value;
+          const partner = document.getElementById('simPartner').value;
+          const seller  = document.getElementById('simSeller').value;
+          const direct  = document.getElementById('simDirect').value;
+          const hours   = document.getElementById('simHours').value;
+          const q = new URLSearchParams({
+            status, delegated: direct, delegated_hours: hours
+          });
+          if (partner) q.set('partner', partner);
+          if (seller)  q.set('seller', seller);
+
+          const res = await fetch(`/simulate/${userId}/one?${q}`, { method:'POST' });
+          const txn = await res.json();
+
+          simBody.innerHTML = `
+            <h3>Simulated Transaction</h3>
+            <ul>
+              <li><strong>Partner:</strong> ${txn.partner}</li>
+              <li><strong>Seller:</strong> ${txn.seller_name}</li>
+              <li><strong>Intent:</strong> ${txn.intent.replace('_',' ')}</li>
+              <li><strong>Amount:</strong> $${txn.amount.toFixed(2)}</li>
+              <li><strong>Delegated:</strong> ${txn.delegated?'Yes':'No'}</li>
+              <li><strong>Status:</strong> ${txn.status==='good'?'Success':txn.status}</li>
+            </ul>
+            <button class="primary" id="closeAfter">Close</button>`;
+          document.getElementById('closeAfter').addEventListener('click', () => {
+            simModal.style.display = 'none';
+          });
+
+          loadSummary();
+          loadStats(currentPeriod);
+        }, { once: true });
+      }
+
+      tabs.forEach(btn => btn.addEventListener('click', () => {
+        tabs.forEach(x => x.classList.remove('active'));
+        btn.classList.add('active');
+        currentPeriod = Number(btn.dataset.period);
+        loadStats(currentPeriod);
+      }));
+
+      new EventSource('/stream').addEventListener('message', e => {
+        const t = JSON.parse(e.data);
+        if (t.user_id === userId) {
+          loadSummary();
+          loadStats(currentPeriod);
+        }
+      });
+
+      loadSummary();
+      loadStats(currentPeriod);
+    });
+  </script>
+</body>
+</html>

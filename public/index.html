@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Live Transaction Dashboard</title>
+  <style>
+    :root {
+      --primary: #5c6ac4;
+      --bg: #f4f5f7;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --card-bg: #ffffff;
+      --card-shadow: rgba(0,0,0,0.1);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 1rem;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 1rem;
+    }
+    nav a {
+      margin-right: 1rem;
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 500;
+    }
+    nav a:last-child { margin-right:0; }
+    h1 { margin: 0; font-size: 1.5rem; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--card-bg);
+      box-shadow: 0 2px 4px var(--card-shadow);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    thead { background: var(--text); }
+    th, td {
+      padding: 0.75rem 1rem;
+    }
+    th {
+      color: #fff;
+      text-align: left;
+      font-weight: 500;
+    }
+    tr:nth-child(even) { background: #f9fafb; }
+    tr:hover { background: #f1f5f9; }
+    a {
+      color: var(--primary);
+      text-decoration: none;
+    }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Live Transaction Dashboard</h1>
+      <nav>
+        <a href="index.html">Dashboard</a>
+        <a href="logs.html">Raw Logs</a>
+        <a href="user.html">User Lookup</a>
+      </nav>
+    </header>
+    <table>
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Txn ID</th>
+          <th>User ID</th>
+          <th>User Name</th>
+          <th>Agent</th>
+          <th>Partner</th>
+          <th>Seller</th>
+          <th>Amount</th>
+          <th>Intent</th>
+          <th>Flags</th>
+        </tr>
+      </thead>
+      <tbody id="tbl"></tbody>
+    </table>
+  </div>
+  <script>
+    const ev = new EventSource('/stream'),
+          tbl = document.getElementById('tbl');
+
+    ev.onmessage = e => {
+      const t = JSON.parse(e.data),
+            tr = document.createElement('tr');
+      tr.dataset.intent = t.intent;
+      tr.innerHTML = `
+        <td>${new Date(t.timestamp).toLocaleTimeString()}</td>
+        <td>${t.txn_id.slice(0,8)}</td>
+        <td><a href="user.html?userId=${t.user_id}">${t.user_id.slice(0,8)}</a></td>
+        <td>${t.user_name}</td>
+        <td>${t.agent_id.slice(0,8)}</td>
+        <td>${t.partner}</td>
+        <td>${t.seller_name}</td>
+        <td>$${t.amount.toFixed(2)}</td>
+        <td>${t.intent.replace('_',' ')}</td>
+        <td>${t.flagged?'⚠️':''}${t.to_review?'🕵️':''}${t.declined?'❌':''}${t.disputed?'💔':''}</td>
+      `;
+      tbl.prepend(tr);
+      if (tbl.children.length > 50) tbl.removeChild(tbl.lastChild);
+    };
+  </script>
+</body>
+</html>
