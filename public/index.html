@@ -86,6 +86,7 @@
           <th>Seller</th>
           <th>Amount</th>
           <th>Intent</th>
+          <th>Decision</th>
           <th>Flags</th>
         </tr>
       </thead>
@@ -93,28 +94,49 @@
     </table>
   </div>
   <script>
-    const ev = new EventSource('/stream'),
-          tbl = document.getElementById('tbl');
+    async function simulateTxn() {
+      const resp = await fetch('/api/eval', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: 'demo-user-001',
+          agent_id: 'agent-123',
+          amount: Math.floor(Math.random() * 100) + 1,
+          currency: 'USD',
+          partner: 'Stripe',
+          seller_name: 'Demo Seller',
+          intent: 'checkout',
+          checkout_time_seconds: Math.floor(Math.random() * 60),
+          account_age_days: Math.floor(Math.random() * 30)
+        })
+      });
+      const txn = await resp.json();
+      addTxnToTable(txn);
+    }
 
-    ev.onmessage = e => {
-      const t = JSON.parse(e.data),
-            tr = document.createElement('tr');
-      tr.dataset.intent = t.intent;
+    function addTxnToTable(t) {
+      const tbl = document.getElementById('tbl');
+      const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td>${new Date(t.timestamp).toLocaleTimeString()}</td>
-        <td>${t.txn_id.slice(0,8)}</td>
+        <td>${new Date(t.timestamp || Date.now()).toLocaleTimeString()}</td>
+        <td>${(t.txn_id || '').slice(0,8)}</td>
         <td><a href="user.html?userId=${t.user_id}">${t.user_id.slice(0,8)}</a></td>
-        <td>${t.user_name}</td>
-        <td>${t.agent_id.slice(0,8)}</td>
-        <td>${t.partner}</td>
-        <td>${t.seller_name}</td>
+        <td>${t.user_name || 'N/A'}</td>
+        <td>${(t.agent_id || '').slice(0,8)}</td>
+        <td>${t.partner || '—'}</td>
+        <td>${t.seller_name || '—'}</td>
         <td>$${t.amount.toFixed(2)}</td>
-        <td>${t.intent.replace('_',' ')}</td>
+        <td>${(t.intent || '').replace('_',' ')}</td>
+        <td>${t.fraud_engine_output?.risk_decision || '—'}</td>
         <td>${t.flagged?'⚠️':''}${t.to_review?'🕵️':''}${t.declined?'❌':''}${t.disputed?'💔':''}</td>
       `;
       tbl.prepend(tr);
       if (tbl.children.length > 50) tbl.removeChild(tbl.lastChild);
-    };
+    }
+
+    // Initial load
+    for (let i = 0; i < 10; i++) simulateTxn();
+    setInterval(simulateTxn, 7000); // every 7 seconds
   </script>
 </body>
 </html>

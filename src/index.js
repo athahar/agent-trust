@@ -1,227 +1,169 @@
 // src/index.js
-import express               from 'express';
-import cors                  from 'cors';
-import dotenv                from 'dotenv';
-import { supabase }          from './dbClient.js';
+import './loadEnv.js'; // <-- MUST be first
+import express from 'express';
+import cors from 'cors';
+import path from 'path';
+import { supabase } from './dbClient.js';
 import { generateTransaction } from './synthetic_generator.js';
-import { v4 as uuidv4 }      from 'uuid';
+import { v4 as uuidv4 } from 'uuid';
+import { evaluateTransaction } from './lib/ruleEngine.js';
+import rulesRouter from './routes/rules.js';
+import { runFraudCheckAndPersist } from './lib/fraudEngineWrapper.js';
 
-dotenv.config();
+const requiredEnvVars = [
+  'SUPABASE_URL',
+  'SUPABASE_ANON_KEY'
+];
+
+const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
+
+if (missingEnvVars.length > 0) {
+  console.error('❌ Missing required environment variables:', missingEnvVars);
+  process.exit(1);
+}
+
 const app = express();
 app.use(cors());
 app.use(express.static('public'));
+app.use(express.json());
+app.use('/rules', rulesRouter);
 
 let userPool = [], userMap = {};
 
-// Load users & backfill on startup
 (async () => {
-  const { data: users } = await supabase
-    .from('users').select('user_id,name');
-  if (users) {
-    for (const u of users) {
+  try {
+    const { data: users, error: usersError } = await supabase
+      .from('users').select('user_id,name');
+
+    if (usersError) throw new Error(`Fetch users: ${usersError.message}`);
+
+    users.forEach(u => {
       userPool.push(u.user_id);
       userMap[u.user_id] = u.name;
-    }
+    });
+
+  } catch (err) {
+    console.error('❌ Fatal init error:', err);
+    process.exit(1);
   }
+})();
 
-  const RECENCY_DAYS = 90;
-  const since = new Date(Date.now() - RECENCY_DAYS*24*60*60*1000).toISOString();
+app.get('/rules/test', (req, res) => {
+  res.sendFile(path.join(process.cwd(), 'public/debug.html'));
+});
 
-  for (const u of users || []) {
-    const { data: aggr } = await supabase
-      .rpc('agent_summary', { p_user_id:u.user_id, p_since:since });
+app.post('/api/eval', async (req, res) => {
+  try {
+    const txn = req.body;
 
-    // compute initial agent score
-    for (const a of aggr || []) {
-      const badCount =
-        (a.flagged_count   || 0) +
-        (a.to_review_count || 0) +
-        (a.declined_count  || 0) +
-        (a.disputed_count  || 0);
-      const initScore = Math.max(0, 100 - badCount * 2);
+    const requiredFields = ['user_id', 'agent_id', 'amount', 'currency'];
+    const missingFields = requiredFields.filter(field => !txn[field]);
 
-      await supabase.from('user_agent_profiles').upsert({
-        user_id:    u.user_id,
-        agent_id:   a.agent_id,
-        score:      initScore,
-        good_count: 0
+    if (missingFields.length > 0) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        missingFields
       });
     }
 
-    // compute overall trust
-    const totalTx  = (aggr||[]).reduce((s,x)=>s+x.txn_count,0);
-    const weighted = (aggr||[]).reduce((s,x)=>s + x.agent_score*x.txn_count,0);
-    const newTrust = totalTx ? Math.round(weighted/totalTx) : 50;
-
-    await supabase
-      .from('users')
-      .update({ risk_profile:newTrust })
-      .eq('user_id', u.user_id);
-  }
-
-  console.log('✅ Backfill complete (90d window)');
-})();
-
-async function recalcUserTrust(userId) {
-  const RECENCY_DAYS = 90;
-  const since = new Date(Date.now() - RECENCY_DAYS*24*60*60*1000).toISOString();
-  const { data: aggr } = await supabase
-    .rpc('agent_summary', { p_user_id:userId, p_since:since });
-
-  const totalTx  = (aggr||[]).reduce((s,x)=>s+x.txn_count,0);
-  const weighted = (aggr||[]).reduce((s,x)=>s + x.agent_score*x.txn_count,0);
-  const newTrust = totalTx ? Math.round(weighted/totalTx) : 50;
-
-  await supabase
-    .from('users')
-    .update({ risk_profile:newTrust })
-    .eq('user_id', userId);
-}
-
-async function processTxn(txn) {
-  const { data: prof } = await supabase
-    .from('user_agent_profiles')
-    .select('score,good_count')
-    .match({ user_id:txn.user_id, agent_id:txn.agent_id })
-    .single();
-
-  let score      = prof?.score      ?? 100;
-  let good_count = prof?.good_count ?? 0;
-  const isBad    = txn.flagged || txn.declined || txn.disputed || txn.to_review;
-
-  if (isBad) {
-    score = Math.max(0, score - 2);
-    good_count = 0;
-  } else {
-    good_count++;
-    const thresh = score < 90 ? 8 : 15;
-    if (good_count >= thresh && score < 100) {
-      score = Math.min(100, score + 1);
-      good_count = 0;
+    if (typeof txn.user_id !== 'string' || 
+        typeof txn.agent_id !== 'string' || 
+        typeof txn.amount !== 'number' || 
+        typeof txn.currency !== 'string') {
+      return res.status(400).json({
+        error: 'Invalid field types',
+        expected: {
+          user_id: 'string',
+          agent_id: 'string',
+          amount: 'number',
+          currency: 'string'
+        }
+      });
     }
+
+    if (txn.amount <= 0) {
+      return res.status(400).json({ error: 'Amount must be positive' });
+    }
+
+    const result = await runFraudCheckAndPersist(txn);
+    res.json(result);
+  } catch (err) {
+    console.error('❌ Eval error:', err.message);
+    res.status(500).json({ error: err.message });
   }
-
-  await supabase.from('user_agent_profiles').upsert({
-    user_id:txn.user_id, agent_id:txn.agent_id, score, good_count
-  });
-
-  await recalcUserTrust(txn.user_id);
-}
-
-// SSE: live stream
-app.get('/stream', (req, res) => {
-  res.set({
-    'Content-Type':'text/event-stream',
-    'Cache-Control':'no-cache',
-    Connection:'keep-alive'
-  });
-
-  const iv = setInterval(async () => {
-    const txn = generateTransaction(userPool);
-    txn.timestamp = new Date().toISOString();
-    txn.user_name = userMap[txn.user_id] || 'Unknown';
-
-    await supabase.from('transactions').insert([txn]);
-    await processTxn(txn);
-
-    res.write(`data: ${JSON.stringify(txn)}\n\n`);
-  }, 1000);
-
-  req.on('close', () => {
-    clearInterval(iv);
-    res.end();
-  });
 });
 
-// SIMULATE endpoint w/ full params
-app.post('/simulate/:userId/one', async (req, res) => {
-  const { userId } = req.params;
-  // … build up txn exactly as before …
-  const statusParam = (req.query.status || 'good').toLowerCase();
-  const partnerParam = req.query.partner;
-  const sellerParam  = req.query.seller;
-  const delegatedParam = req.query.delegated;
-  const hoursOffset   = parseFloat(req.query.delegated_hours) || 2;
-
-  console.log("---------");
-  console.log("userId: " + userId);
-  console.log("partnerParam: " + partnerParam);
-  console.log("statusParam: " + statusParam);
-  console.log("---------");
-
-  let txn = generateTransaction([userId]);
-  txn.timestamp       = new Date().toISOString();
-  txn.user_name       = userMap[userId] || 'Unknown';
-
-  if (partnerParam) {
-    txn.partner     = partnerParam;
-    txn.agent_id    = `${userId}_${partnerParam}`;
-    txn.agent_token = `token_${txn.agent_id}`;
-  }
-  if (sellerParam) txn.seller_name = sellerParam;
-  txn.delegated       = delegatedParam === 'direct' ? false : true;
-  txn.delegation_time = new Date(Date.now() - hoursOffset*3600*1000).toISOString();
-
-  txn.flagged    = false;
-  txn.to_review  = false;
-  txn.declined   = false;
-  txn.disputed   = false;
-  switch (statusParam) {
-    case 'flagged':  txn.flagged   = true; break;
-    case 'review':   txn.to_review = true; break;
-    case 'declined': txn.declined  = true; break;
-    case 'disputed': txn.disputed  = true; break;
+app.post('/api/rules', async (req, res) => {
+  const rule = req.body;
+  if (!rule || !rule.id || !Array.isArray(rule.conditions)) {
+    return res.status(400).json({ error: 'Invalid rule payload' });
   }
 
-  // strip both status & user_name before insert
-  const { status, user_name, ...toInsert } = { ...txn, status: statusParam };
-
-  const { error: insertErr } = await supabase
-    .from('transactions')
-    .insert([toInsert]);
-  if (insertErr) {
-    console.error('🚨 insert failed:', insertErr);
-    return res.status(500).json({ error: insertErr.message });
-  }
-
-  await processTxn(toInsert);
-
-  // echo the full txn back (including status)
-  res.json({ ...toInsert, status: statusParam });
-});
-
-// User summary
-app.get('/user/:userId/summary', async (req, res) => {
-  const { userId } = req.params;
   const { data, error } = await supabase
-    .from('users').select('user_id,name,risk_profile').eq('user_id', userId).single();
-  if (error) return res.status(500).json({ error:error.message });
-  res.json(data);
+    .from('fraud_rules')
+    .update({
+      rule: rule.rule,
+      decision: rule.decision,
+      conditions: rule.conditions,
+      category: rule.category
+    })
+    .eq('id', rule.id);
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true, updated: data });
 });
 
-// Agent stats
-app.get('/user/:userId/agents', async (req, res) => {
-  const { userId } = req.params;
-  const days = Number(req.query.period) || 30;
-  const since = new Date(Date.now() - days*24*60*60*1000).toISOString();
+app.get('/api/samples', async (req, res) => {
   const { data, error } = await supabase
-    .rpc('agent_summary', { p_user_id:userId, p_since:since });
-  if (error) return res.status(500).json({ error:error.message });
-  res.json(data);
-});
-
-// Raw transaction history
-app.get('/simulate/:userId', async (req, res) => {
-  const { userId } = req.params;
-  const { data, error } = await supabase
-    .from('transactions')
+    .from('sample_transactions')
     .select('*')
-    .eq('user_id', userId)
-    .order('timestamp',{ascending:false})
-    .limit(200);
-  if (error) return res.status(500).json({ error:error.message });
-  res.json(data.reverse());
+    .order('created_at', { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
 });
 
-const PORT = process.env.PORT||3000;
-app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+app.post('/api/samples', async (req, res) => {
+  const { name, description, txn } = req.body;
+  if (!name || !txn) {
+    return res.status(400).json({ error: 'Missing name or txn' });
+  }
+
+  const { error } = await supabase
+    .from('sample_transactions')
+    .insert([{ name, description, txn }]);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
+app.get('/api/rule-stats', async (req, res) => {
+  const { data, error } = await supabase.from('rule_trigger_counts').select('*');
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+const server = app.listen(3000, () => console.log('🚀 Server running on http://localhost:3000'));
+
+const shutdown = async (signal) => {
+  console.log(`\n${signal} received. Starting graceful shutdown...`);
+  server.close(() => {
+    console.log('Server closed');
+  });
+
+  setTimeout(() => {
+    console.log('Shutdown complete');
+    process.exit(0);
+  }, 1000);
+};
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  shutdown('UNCAUGHT_EXCEPTION');
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  shutdown('UNHANDLED_REJECTION');
+});

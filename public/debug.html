@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Rule Debug Tester</title>
+  <style>
+    body { font-family: sans-serif; margin: 2rem; }
+    textarea, input, select { width: 100%; padding: 0.5rem; margin-bottom: 1rem; }
+    textarea { height: 200px; }
+    pre { background: #eee; padding: 1rem; white-space: pre-wrap; }
+    .tag { display: inline-block; padding: 0.25rem 0.5rem; border-radius: 5px; margin-right: 5px; font-size: 0.9rem; }
+    .behavioral { background: #cce5ff; color: #004085; }
+    .payment { background: #d4edda; color: #155724; }
+    .delegation { background: #fff3cd; color: #856404; }
+    .location { background: #f8d7da; color: #721c24; }
+    .flex { display: flex; gap: 1rem; flex-wrap: wrap; }
+    .half { flex: 1 1 45%; }
+    button { padding: 0.5rem 1rem; }
+  </style>
+</head>
+<body>
+  <h1>🛡️ Rule Debug Tester</h1>
+
+  <div class="flex">
+    <div class="half">
+      <label>Saved Examples:</label>
+      <select id="sampleSelect" onchange="loadSelectedSample()">
+        <option value="">-- Load saved sample --</option>
+      </select>
+    </div>
+    <div class="half">
+      <label>New Sample Name:</label>
+      <input id="sampleName" placeholder="e.g. Foreign flagged IP" />
+    </div>
+  </div>
+
+  <label for="exampleSelect">Quick Examples:</label>
+  <select id="exampleSelect" onchange="loadExample()">
+    <option value="default">Default Transaction</option>
+    <option value="delegation">Suspicious Delegation</option>
+    <option value="foreign">Foreign IP + Delegated</option>
+  </select>
+
+  <textarea id="txnInput"></textarea>
+
+  <div class="flex">
+    <button onclick="testRules()">🔍 Evaluate</button>
+    <button onclick="saveSample()">💾 Save Sample</button>
+  </div>
+
+  <h3>🧾 Result:</h3>
+  <pre id="result"></pre>
+
+  <h2>📊 Top Triggered Rules</h2>
+  <canvas id="ruleChart" width="600" height="300"></canvas>
+
+  <h2>🛠️ Rule Editor</h2>
+  <textarea id="ruleEditor">[]</textarea>
+  <button onclick="saveRules()">Save Rules</button>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    const examples = {
+      default: {
+        "user_id": "user_123",
+        "agent_id": "user_123_chatgpt",
+        "delegated": true,
+        "delegation_time": "2024-05-26T02:00:00.000Z",
+        "timestamp": "2024-05-27T10:00:00.000Z",
+        "ip": "203.0.113.42",
+        "country": "CN",
+        "seller_name": "AcmeCorp",
+        "disputed": false,
+        "flagged": false,
+        "amount": 125,
+        "currency": "USD"
+      },
+      delegation: {
+        "user_id": "user_456",
+        "agent_id": "user_456_claude",
+        "delegated": true,
+        "delegation_time": "2024-05-25T02:00:00.000Z",
+        "timestamp": "2024-05-27T10:00:00.000Z",
+        "amount": 300,
+        "currency": "USD",
+        "country": "US"
+      },
+      foreign: {
+        "user_id": "user_789",
+        "agent_id": "user_789_gemini",
+        "delegated": true,
+        "delegation_time": "2024-05-27T00:00:00.000Z",
+        "timestamp": "2024-05-27T04:00:00.000Z",
+        "ip": "196.21.34.1",
+        "country": "RU",
+        "amount": 500,
+        "currency": "USD"
+      }
+    };
+
+    function loadExample() {
+      const key = document.getElementById('exampleSelect').value;
+      document.getElementById('txnInput').value = JSON.stringify(examples[key], null, 2);
+    }
+
+    async function loadSampleList() {
+      const res = await fetch('/api/samples');
+      const data = await res.json();
+      const select = document.getElementById('sampleSelect');
+      data.forEach(sample => {
+        const opt = document.createElement('option');
+        opt.value = JSON.stringify(sample.txn);
+        opt.textContent = sample.name;
+        select.appendChild(opt);
+      });
+    }
+
+    function loadSelectedSample() {
+      const value = document.getElementById('sampleSelect').value;
+      if (value) {
+        document.getElementById('txnInput').value = JSON.stringify(JSON.parse(value), null, 2);
+      }
+    }
+
+    async function saveSample() {
+      const txn = JSON.parse(document.getElementById('txnInput').value);
+      const name = document.getElementById('sampleName').value.trim();
+      if (!name) return alert('Please enter a name');
+      const res = await fetch('/api/samples', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, txn })
+      });
+      const result = await res.json();
+      if (result.success) {
+        alert('✅ Saved');
+        location.reload();
+      } else {
+        alert('❌ Failed to save: ' + result.error);
+      }
+    }
+
+    async function testRules() {
+      const txn = JSON.parse(document.getElementById('txnInput').value);
+      const res = await fetch('/api/eval', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(txn)
+      });
+      const data = await res.json();
+      let html = `Decision: ${data.decision}\n\nTriggered Rules:\n`;
+      for (const rule of data.triggered) {
+        const category = rule.rule.split(':')[0];
+        const tag = `<span class="tag ${category.toLowerCase()}">${category}</span>`;
+        html += `${tag} ${rule.rule}\n`;
+      }
+      document.getElementById('result').innerHTML = html;
+    }
+
+    async function loadRuleStats() {
+      const res = await fetch('/api/rule-stats');
+      const stats = await res.json();
+      const ctx = document.getElementById('ruleChart').getContext('2d');
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: stats.map(r => r.rule),
+          datasets: [{
+            label: '# of Triggers',
+            data: stats.map(r => r.trigger_count),
+            backgroundColor: 'rgba(54, 162, 235, 0.6)'
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          plugins: {
+            title: { display: true, text: 'Top Triggered Rules' },
+            legend: { display: false }
+          }
+        }
+      });
+    }
+
+    async function saveRules() {
+      try {
+        const rules = JSON.parse(document.getElementById('ruleEditor').value);
+        const res = await fetch('/api/rules', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rules })
+        });
+        const result = await res.json();
+        if (result.success) alert('✅ Rules saved!');
+        else alert('❌ Error: ' + result.error);
+      } catch (err) {
+        alert('❌ Invalid rule JSON');
+      }
+    }
+
+    loadExample();
+    loadRuleStats();
+    loadSampleList();
+  </script>
+</body>
+</html>

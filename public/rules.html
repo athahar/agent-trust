@@ -1,64 +1,284 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Fraud Rule Manager</title>
+  <meta charset="UTF-8">
+  <title>Fraud Rules Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { padding: 20px; }
+    .modal-label { font-weight: bold; }
+    .filter-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .search-select { width: 200px; margin-right: 10px; }
+    .description { font-style: italic; color: #555; }
+    .op-in { color: green; font-weight: bold; }
+    .op-not { color: red; font-weight: bold; }
+    .op-contains { color: blue; font-weight: bold; }
+  </style>
 </head>
 <body>
-  <h1>Fraud Rules Dashboard</h1>
+  <h2>Fraud Rule Management</h2>
 
-  <form id="ruleForm">
-    <input name="rule_name" placeholder="Rule Name" required />
-    <input name="condition" placeholder="Condition" required />
-    <input name="action" placeholder="Action" required />
-    <input name="priority" type="number" placeholder="Priority" required />
-    <input name="classification" placeholder="Classification (default: AI Agent Fraud)" />
-    <label>
-      <input name="enabled" type="checkbox" checked /> Enabled
-    </label>
-    <button type="submit">Add Rule</button>
-  </form>
+  <div class="filter-row">
+    <div>
+      <input type="checkbox" id="showDisabledOnly"> <label for="showDisabledOnly">Show only disabled rules</label>
+    </div>
+    <div>
+      <select id="searchColumn" class="search-select">
+        <option value="rule_name">Rule Name</option>
+        <option value="condition">Condition</option>
+        <option value="action">Action</option>
+        <option value="classification">Classification</option>
+        <option value="behavioral_rule">Behavioral Rule</option>
+      </select>
+      <input type="text" id="searchInput" placeholder="Search..." class="form-control d-inline-block" style="width: 300px;">
+    </div>
+  </div>
 
-  <hr />
-  <h2>Existing Rules</h2>
-  <ul id="rulesList"></ul>
+  <table class="table table-bordered table-hover" id="rulesTable">
+    <thead class="table-light">
+      <tr>
+        <th>#</th>
+        <th>Rule Name</th>
+        <th>Condition</th>
+        <th>Action</th>
+        <th>Classification</th>
+        <th>Applies To</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
 
+  <!-- Modal -->
+  <div class="modal fade" id="ruleModal" tabindex="-1" aria-labelledby="ruleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content p-4">
+        <div class="modal-header border-bottom-0">
+          <div>
+            <h4 class="modal-title fw-semibold" id="modalRuleName"></h4>
+            <small class="text-muted" id="modalMeta"></small>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+
+        <div class="modal-body">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <span id="modalStatus" class="badge px-3 py-2 fs-6"></span>
+            <button id="toggleStatusBtn" class="btn btn-outline-secondary btn-sm"></button>
+          </div>
+
+          <p class="text-muted fst-italic mb-4" id="modalDescription"></p>
+
+          <div class="mb-4">
+            <h6 class="fw-bold text-uppercase text-secondary small">Rule Details</h6>
+            <div class="mb-2"><strong>Condition:</strong> <span id="modalCondition"></span></div>
+            <div class="mb-2"><strong>Applies To:</strong> <span id="modalApplies"></span></div>
+            <div class="mb-2"><strong>Classification:</strong> <span id="modalClassification"></span></div>
+          </div>
+
+          <div class="mb-3">
+            <h6 class="fw-bold text-uppercase text-secondary small">Match Summary</h6>
+            <div class="mb-2"><strong>Matches:</strong> <span id="modalMatchCount"></span> in last 90 days</div>
+            <div id="modalTxnList" class="table-responsive"></div>
+            <a href="#" id="viewAllLink" class="d-block mt-2 small text-primary">View all matching transactions</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script>
-    async function loadRules() {
-      const res = await fetch('/rules');
-      const rules = await res.json();
-      const list = document.getElementById('rulesList');
-      list.innerHTML = '';
-      rules.forEach(rule => {
-        const li = document.createElement('li');
-        li.textContent = `[${rule.priority}] ${rule.rule_name} - ${rule.condition} -> ${rule.action}`;
-        list.appendChild(li);
+    const ruleModal = new bootstrap.Modal(document.getElementById('ruleModal'));
+
+    function formatCondition(cond) {
+      if (!cond) return '[No condition]';
+
+      const formatSingle = ({ field, op, value }) => {
+        let opClass = '';
+        if (['not_in', '!=', 'not_contains'].includes(op)) opClass = 'op-not';
+        else if (['contains'].includes(op)) opClass = 'op-contains';
+        else if (['in'].includes(op)) opClass = 'op-in';
+
+        const simpleOps = {
+          '==': 'is',
+          '!=': 'is not',
+          '>': '&gt;',
+          '<': '&lt;',
+          '>=': '&ge;',
+          '<=': '&le;',
+          'contains': 'contains',
+          'not_contains': 'does not contain',
+          'in': 'is one of',
+          'not_in': 'does not have'
+        };
+
+        const formattedVal = Array.isArray(value) ? value.join(', ') : value;
+        return `<span class="${opClass}" title='${JSON.stringify({ field, op, value })}'>${field} ${simpleOps[op] || op} ${formattedVal}</span>`;
+
+      };
+
+      if (Array.isArray(cond)) {
+        const hasHourNotIn = cond.find(c => c.field === 'hour' && c.op === 'not_in');
+        const hasDelegation = cond.find(c => c.field === 'delegation' && c.op === '==');
+        if (hasHourNotIn && hasDelegation) {
+          const hours = hasHourNotIn.value || [];
+          const min = Math.min(...hours), max = Math.max(...hours);
+          return `delegation hour outside of ${min}am to ${max}pm`;
+        }
+        return '<ul>' + cond.map(c => `<li>${formatSingle(c)}</li>`).join('') + '</ul>';
+      }
+
+      if (typeof cond === 'object') return formatSingle(cond);
+      return String(cond);
+    }
+
+    async function fetchRules() {
+      const all = document.getElementById("showDisabledOnly").checked;
+      const res = await fetch(`/rules?all=${all}`);
+      return await res.json();
+    }
+
+    async function fetchRuleMatches(ruleId) {
+      const res = await fetch(`/rules/${ruleId}/matches`);
+      if (!res.ok) throw new Error("Failed to fetch matches");
+      return await res.json();
+    }
+
+    function formatCondition(cond) {
+  if (!cond) return '[No condition]';
+
+  const formatSingle = ({ field, op, value }) => {
+    let opClass = '';
+    if (['not_in', '!=', 'not_contains'].includes(op)) opClass = 'op-not';
+    else if (['contains'].includes(op)) opClass = 'op-contains';
+    else if (['in'].includes(op)) opClass = 'op-in';
+
+    const simpleOps = {
+      '==': 'is',
+      '!=': 'is not',
+      '>': '&gt;',
+      '<': '&lt;',
+      '>=': '&ge;',
+      '<=': '&le;',
+      'contains': 'contains',
+      'not_contains': 'does not contain',
+      'in': 'is one of',
+      'not_in': 'does not have'
+    };
+
+    const formattedVal = Array.isArray(value) ? value.join(', ') : value;
+    const display = `${field} ${simpleOps[op] || op} ${formattedVal}`;
+    const rawJson = JSON.stringify({ field, op, value });
+
+    return `<span class="${opClass}" title='${rawJson}'>${display}</span>`;
+  };
+
+  if (Array.isArray(cond)) {
+    const hasHourNotIn = cond.find(c => c.field === 'hour' && c.op === 'not_in');
+    const hasDelegation = cond.find(c => c.field === 'delegation' && c.op === '==');
+    if (hasHourNotIn && hasDelegation) {
+      const hours = hasHourNotIn.value || [];
+      const min = Math.min(...hours), max = Math.max(...hours);
+      return `delegation hour outside of ${min}am to ${max}pm`;
+    }
+    return '<ul>' + cond.map(c => `<li>${formatSingle(c)}</li>`).join('') + '</ul>';
+  }
+
+  if (typeof cond === 'object') return formatSingle(cond);
+  return String(cond);
+}
+
+    function renderRules(rules) {
+      const table = document.querySelector("#rulesTable tbody");
+      table.innerHTML = "";
+      rules.forEach((r, i) => {
+        const tr = document.createElement("tr");
+        tr.style.cursor = 'pointer';
+        tr.innerHTML = `
+          <td>${i + 1}</td>
+          <td>${r.rule_name}</td>
+          <td>${typeof r.condition === 'object' ? formatCondition(r.condition) : r.condition}</td>
+          <td>${r.action}</td>
+          <td>${r.classification}</td>
+          <td>${r.applies_to}</td>
+          <td>${r.enabled ? 'Enabled' : 'Disabled'}</td>
+        `;
+        tr.onclick = () => showModal(r);
+        table.appendChild(tr);
       });
     }
 
-    document.getElementById('ruleForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const form = new FormData(e.target);
-      const body = {};
-      form.forEach((v, k) => body[k] = v);
-      body.enabled = form.get('enabled') === 'on';
+    async function showModal(rule) {
+      const created = rule.created_at ? new Date(rule.created_at).toLocaleString() : 'Unknown';
+      const approved = rule.approved_at ? new Date(rule.approved_at).toLocaleString() : 'Unknown';
 
-      const res = await fetch('/rules', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
+      document.getElementById("modalRuleName").innerText = rule.rule_name;
+      document.getElementById("modalMeta").innerText =
+        `Created by ${rule.created_by_name || 'Unknown'} (${created}) • ` +
+        `Approved by ${rule.approved_by_name || 'Unknown'} (${approved})`;
+      document.getElementById("modalStatus").innerText = rule.enabled ? "Enabled" : "Disabled";
+      document.getElementById("modalStatus").className = `badge ${rule.enabled ? "bg-success" : "bg-secondary"}`;
+      document.getElementById("toggleStatusBtn").innerText = rule.enabled ? "Disable Rule" : "Enable Rule";
+      document.getElementById("modalDescription").innerText = rule.description || 'No description.';
+      document.getElementById("modalCondition").innerHTML = formatCondition(rule.condition);
+      document.getElementById("modalApplies").innerText = rule.applies_to;
+      document.getElementById("modalClassification").innerText = rule.classification;
+      document.getElementById("viewAllLink").style.display = 'none';
 
-      if (res.ok) {
-        e.target.reset();
-        loadRules();
-      } else {
-        alert('Error adding rule');
+      try {
+        const matchData = await fetchRuleMatches(rule.id);
+        const { count = 0, txns = [] } = matchData || {};
+        document.getElementById("modalMatchCount").innerText = `${count} in last 90 days`;
+
+        if (txns.length === 0) {
+          document.getElementById("modalTxnList").innerHTML = `<div class="text-muted">No recent matches found for this rule.</div>`;
+        } else {
+          document.getElementById("modalTxnList").innerHTML = `
+            <table class="table table-sm table-hover align-middle">
+              <thead class="table-light">
+                <tr><th>ID</th><th>Amount</th><th>User</th><th>Date</th><th>Status</th></tr>
+              </thead>
+              <tbody>
+                ${txns.map(txn => `
+                  <tr>
+                    <td>#${txn.id}</td>
+                    <td>$${txn.amount.toFixed(2)}</td>
+                    <td>${txn.user_id}</td>
+                    <td>${new Date(txn.timestamp).toLocaleString()}</td>
+                    <td>${txn.status}</td>
+                  </tr>`).join('')}
+              </tbody>
+            </table>`;
+          document.getElementById("viewAllLink").href = `/transactions?rule_id=${rule.id}`;
+          document.getElementById("viewAllLink").style.display = 'block';
+        }
+      } catch (e) {
+        document.getElementById("modalTxnList").innerHTML = `<div class="text-muted">Could not load match data.</div>`;
       }
+
+      ruleModal.show();
+    }
+
+    document.getElementById('searchInput').addEventListener('input', async (e) => {
+      const searchTerm = e.target.value.toLowerCase();
+      const searchColumn = document.getElementById('searchColumn').value;
+      const rules = await fetchRules();
+      const filteredRules = rules.filter(rule =>
+        String(rule[searchColumn]).toLowerCase().includes(searchTerm)
+      );
+      renderRules(filteredRules);
     });
 
-    loadRules();
+    document.getElementById('showDisabledOnly').addEventListener('change', async () => {
+      const rules = await fetchRules();
+      renderRules(rules);
+    });
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      const rules = await fetchRules();
+      renderRules(rules);
+    });
   </script>
 </body>
 </html>
