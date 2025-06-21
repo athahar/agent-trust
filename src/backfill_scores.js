@@ -5,7 +5,7 @@ dotenv.config();
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
 async function backfill() {
@@ -27,7 +27,7 @@ async function backfill() {
     });
     if (rpcErr) throw rpcErr;
 
-    // 3) Upsert each agent’s initial score
+    // 3) Upsert each agent's initial score
     let totalTx = 0;
     let weightedSum = 0;
 
