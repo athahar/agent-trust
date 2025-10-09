@@ -1,0 +1,137 @@
+[
+  {
+    "name": "high-value-mobile",
+    "rule": {
+      "ruleset_name": "high-value-mobile-transactions",
+      "description": "Review mobile transactions over $10,000 for fraud risk",
+      "decision": "review",
+      "conditions": [
+        { "field": "amount", "op": ">", "value": 10000 },
+        { "field": "device", "op": "==", "value": "mobile" }
+      ]
+    },
+    "expected_valid": true,
+    "expected_matches_on_golden_set": 15
+  },
+  {
+    "name": "first-transaction-high-value",
+    "rule": {
+      "ruleset_name": "block-first-high-value",
+      "description": "Block first transactions over $50k due to high fraud risk",
+      "decision": "block",
+      "conditions": [
+        { "field": "amount", "op": ">", "value": 50000 },
+        { "field": "is_first_transaction", "op": "==", "value": true }
+      ]
+    },
+    "expected_valid": true,
+    "expected_matches_on_golden_set": 3
+  },
+  {
+    "name": "after-hours-large",
+    "rule": {
+      "ruleset_name": "after-hours-large-transactions",
+      "description": "Review large transactions outside business hours (before 9am or after 5pm)",
+      "decision": "review",
+      "conditions": [
+        { "field": "amount", "op": ">", "value": 5000 },
+        { "field": "hour", "op": "<", "value": 9 }
+      ]
+    },
+    "expected_valid": true,
+    "expected_matches_on_golden_set": 8
+  },
+  {
+    "name": "new-account-large",
+    "rule": {
+      "ruleset_name": "new-account-large-purchase",
+      "description": "Review large purchases from accounts less than 30 days old",
+      "decision": "review",
+      "conditions": [
+        { "field": "amount", "op": ">", "value": 1000 },
+        { "field": "account_age_days", "op": "<", "value": 30 }
+      ]
+    },
+    "expected_valid": true,
+    "expected_matches_on_golden_set": 12
+  },
+  {
+    "name": "flagged-retry",
+    "rule": {
+      "ruleset_name": "flagged-transaction-retry",
+      "description": "Block transactions that were previously flagged",
+      "decision": "block",
+      "conditions": [
+        { "field": "flagged", "op": "==", "value": true }
+      ]
+    },
+    "expected_valid": true,
+    "expected_matches_on_golden_set": 25
+  },
+  {
+    "name": "multi-partner-high-value",
+    "rule": {
+      "ruleset_name": "high-value-stripe-paypal",
+      "description": "Review high-value transactions on Stripe or PayPal",
+      "decision": "review",
+      "conditions": [
+        { "field": "amount", "op": ">", "value": 10000 },
+        { "field": "partner", "op": "in", "value": ["stripe", "paypal"] }
+      ]
+    },
+    "expected_valid": true,
+    "expected_matches_on_golden_set": 10
+  },
+  {
+    "name": "invalid-disallowed-field",
+    "rule": {
+      "ruleset_name": "geographic-discrimination",
+      "description": "INVALID: Uses disallowed geographic field",
+      "decision": "block",
+      "conditions": [
+        { "field": "country_of_origin", "op": "==", "value": "NG" }
+      ]
+    },
+    "expected_valid": false,
+    "expected_policy_violation": "disallowed_field"
+  },
+  {
+    "name": "invalid-enum-value",
+    "rule": {
+      "ruleset_name": "invalid-device-enum",
+      "description": "INVALID: Uses invalid device enum value",
+      "decision": "review",
+      "conditions": [
+        { "field": "device", "op": "==", "value": "desktop" }
+      ]
+    },
+    "expected_valid": false,
+    "expected_validation_error": "not a valid value"
+  },
+  {
+    "name": "invalid-range",
+    "rule": {
+      "ruleset_name": "invalid-amount-range",
+      "description": "INVALID: Amount exceeds maximum",
+      "decision": "review",
+      "conditions": [
+        { "field": "amount", "op": ">", "value": 2000000 }
+      ]
+    },
+    "expected_valid": false,
+    "expected_validation_error": "out of range"
+  },
+  {
+    "name": "invalid-operator",
+    "rule": {
+      "ruleset_name": "invalid-operator-for-type",
+      "description": "INVALID: Boolean field with comparison operator",
+      "decision": "review",
+      "conditions": [
+        { "field": "flagged", "op": ">", "value": true }
+      ]
+    },
+    "expected_valid": false,
+    "expected_validation_error": "not valid for field"
+  }
+]

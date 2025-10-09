@@ -1,0 +1,31 @@
+{
+  "description": "Schema for golden dataset validation",
+  "required": [
+    "txn_id",
+    "amount",
+    "currency",
+    "device",
+    "agent_id",
+    "partner",
+    "intent",
+    "timestamp",
+    "hour",
+    "account_age_days",
+    "is_first_transaction",
+    "fraud_engine_output"
+  ],
+  "types": {
+    "amount": "number",
+    "hour": "number",
+    "account_age_days": "number",
+    "device": "string",
+    "agent_id": "string",
+    "partner": "string",
+    "intent": "string",
+    "flagged": "boolean",
+    "is_first_transaction": "boolean"
+  },
+  "device_enum": ["web", "mobile", "tablet"],
+  "partner_enum": ["amazon", "shopify", "stripe", "paypal", "square", "adyen", "checkout"],
+  "intent_enum": ["purchase", "refund", "transfer", "withdrawal"]
+}

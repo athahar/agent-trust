@@ -7,14 +7,21 @@ import { supabase } from './dbClient.js';
 // import { generateTransaction } from './synthetic_generator.js';
 import { v4 as uuidv4 } from 'uuid';
 import rulesRouter from './routes/rules.js';
+import userRouter from './routes/user.js';
+import ruleSuggestRouter from './routes/ruleSuggest.js';
+import ruleApplyRouter from './routes/ruleApply.js';
 import { runFraudCheckAndPersist } from './lib/fraudEngineWrapper.js';
 import { generateTransaction } from './generateTransaction.js';
+
 
 const app = express();
 app.use(cors());
 app.use(express.static('public'));
 app.use(express.json());
 app.use('/rules', rulesRouter);
+app.use('/user', userRouter);
+app.use('/api/rules', ruleSuggestRouter);
+app.use('/api/rules', ruleApplyRouter);
 
 let userPool = [], userMap = {};
 
@@ -213,3 +220,6 @@ process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
   shutdown('UNHANDLED_REJECTION');
 });
+
+// Export app for testing with supertest
+export default app;

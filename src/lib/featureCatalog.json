@@ -1,0 +1,249 @@
+{
+  "version": "1.0.0",
+  "last_updated": "2025-01-08",
+  "description": "Single source of truth for all transaction fields available in fraud rules",
+
+  "features": [
+    {
+      "name": "amount",
+      "type": "number",
+      "range": [0, 1000000],
+      "unit": "USD",
+      "description": "Transaction amount in US dollars",
+      "examples": [50.00, 1250.99, 10000.00],
+      "nullability": "not_null",
+      "pii": false
+    },
+    {
+      "name": "hour",
+      "type": "integer",
+      "range": [0, 23],
+      "description": "Hour of day when transaction occurred (0-23, 24-hour format)",
+      "examples": [9, 14, 22],
+      "nullability": "not_null",
+      "pii": false
+    },
+    {
+      "name": "agent_id",
+      "type": "enum",
+      "values": ["openai", "anthropic", "gemini", "ramp", "stripe", "payman", "nekuda"],
+      "description": "Agent/partner identifier executing the transaction",
+      "examples": ["openai", "anthropic", "stripe"],
+      "nullability": "not_null",
+      "pii": false
+    },
+    {
+      "name": "partner",
+      "type": "enum",
+      "values": ["amazon", "shopify", "stripe", "paypal", "square", "adyen", "checkout"],
+      "description": "Partner/merchant platform name",
+      "examples": ["stripe", "paypal", "shopify"],
+      "nullability": "not_null",
+      "pii": false
+    },
+    {
+      "name": "device",
+      "type": "enum",
+      "values": ["web", "mobile", "tablet"],
+      "description": "Device type used for transaction",
+      "examples": ["mobile", "web"],
+      "nullability": "not_null",
+      "pii": false
+    },
+    {
+      "name": "delegation_duration_hours",
+      "type": "number",
+      "range": [0, 8760],
+      "description": "Hours since agent was delegated (max 1 year = 8760 hours)",
+      "examples": [2, 48, 168],
+      "nullability": "nullable",
+      "pii": false
+    },
+    {
+      "name": "account_age_days",
+      "type": "integer",
+      "range": [0, 36500],
+      "description": "Days since user account was created (max 100 years)",
+      "examples": [0, 30, 365, 1000],
+      "nullability": "nullable",
+      "pii": false
+    },
+    {
+      "name": "seller_name",
+      "type": "string",
+      "max_length": 200,
+      "description": "Merchant/seller name",
+      "examples": ["Amazon", "Walmart", "Target"],
+      "nullability": "nullable",
+      "pii": true
+    },
+    {
+      "name": "seller_url",
+      "type": "string",
+      "format": "url",
+      "max_length": 500,
+      "description": "Merchant website URL",
+      "examples": ["https://amazon.com", "https://walmart.com"],
+      "nullability": "nullable",
+      "pii": false
+    },
+    {
+      "name": "intent",
+      "type": "enum",
+      "values": ["ecommerce_booking", "travel_booking", "invoice_payment", "subscription"],
+      "description": "Transaction intent/purpose",
+      "examples": ["ecommerce_booking", "subscription"],
+      "nullability": "not_null",
+      "pii": false
+    },
+    {
+      "name": "risk_score",
+      "type": "integer",
+      "range": [0, 100],
+      "description": "Current computed risk score (0=low risk, 100=high risk)",
+      "examples": [25, 50, 85],
+      "nullability": "nullable",
+      "pii": false
+    },
+    {
+      "name": "flagged",
+      "type": "boolean",
+      "description": "Whether transaction is flagged for review",
+      "examples": [true, false],
+      "nullability": "not_null",
+      "pii": false
+    },
+    {
+      "name": "delegated",
+      "type": "boolean",
+      "description": "Whether transaction was delegated to an agent",
+      "examples": [true, false],
+      "nullability": "not_null",
+      "pii": false
+    },
+    {
+      "name": "user_id",
+      "type": "string",
+      "format": "uuid",
+      "description": "User identifier (UUID format)",
+      "examples": ["550e8400-e29b-41d4-a716-446655440000"],
+      "nullability": "not_null",
+      "pii": true
+    },
+    {
+      "name": "agent_scope",
+      "type": "enum",
+      "values": ["read", "write", "transact", "refund", "delete", "cancel"],
+      "description": "Permissions scope of the agent",
+      "examples": ["transact", "read", "write"],
+      "nullability": "nullable",
+      "pii": false
+    },
+    {
+      "name": "checkout_time_seconds",
+      "type": "integer",
+      "range": [0, 3600],
+      "description": "Time spent in checkout flow (seconds, max 1 hour)",
+      "examples": [30, 60, 120],
+      "nullability": "nullable",
+      "pii": false
+    },
+    {
+      "name": "disputed",
+      "type": "boolean",
+      "description": "Whether transaction has been disputed by user",
+      "examples": [true, false],
+      "nullability": "not_null",
+      "pii": false
+    },
+    {
+      "name": "declined",
+      "type": "boolean",
+      "description": "Whether transaction was declined",
+      "examples": [true, false],
+      "nullability": "not_null",
+      "pii": false
+    },
+    {
+      "name": "is_first_transaction",
+      "type": "boolean",
+      "description": "Whether this is the user's first transaction",
+      "examples": [true, false],
+      "nullability": "not_null",
+      "pii": false
+    },
+    {
+      "name": "currency",
+      "type": "enum",
+      "values": ["USD", "EUR", "GBP"],
+      "description": "Transaction currency code",
+      "examples": ["USD"],
+      "nullability": "not_null",
+      "pii": false
+    }
+  ],
+
+  "operators": {
+    "number": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in"],
+    "integer": ["==", "!=", ">", "<", ">=", "<=", "in", "not_in"],
+    "string": ["==", "!=", "in", "not_in", "contains", "not_contains"],
+    "boolean": ["==", "!="],
+    "enum": ["==", "!=", "in", "not_in"]
+  },
+
+  "actions": [
+    {
+      "type": "decide",
+      "description": "Make a fraud decision",
+      "params": {
+        "decision": {
+          "type": "enum",
+          "values": ["allow", "review", "block"],
+          "required": true
+        }
+      }
+    },
+    {
+      "type": "set_value",
+      "description": "Set a field value",
+      "params": {
+        "field": { "type": "string", "required": true },
+        "value": { "type": "any", "required": true }
+      }
+    },
+    {
+      "type": "flag",
+      "description": "Add a risk flag/tag",
+      "params": {
+        "tag": { "type": "string", "required": true }
+      }
+    }
+  ],
+
+  "policy": {
+    "disallowed_fields": [
+      "country_of_origin",
+      "zipcode",
+      "ip_city_proxy",
+      "ip_address",
+      "user_id",
+      "email",
+      "seller_tax_id"
+    ],
+    "pii_fields": ["seller_name", "user_id", "email"],
+    "max_conditions_per_rule": 10,
+    "require_explanation": true,
+    "policy_patterns": {
+      "sensitive_language": [
+        {"pattern": "geograph", "severity": "error", "message": "Geographic discrimination not allowed"},
+        {"pattern": "ethnic", "severity": "error", "message": "Ethnic discrimination not allowed"},
+        {"pattern": "national", "severity": "error", "message": "National origin discrimination not allowed"},
+        {"pattern": "race", "severity": "error", "message": "Racial discrimination not allowed"},
+        {"pattern": "religion", "severity": "error", "message": "Religious discrimination not allowed"},
+        {"pattern": "\\bcountry\\b", "severity": "warning", "message": "Country-based rules may violate policy"},
+        {"pattern": "\\bstate\\b", "severity": "warning", "message": "State-based rules may violate policy"},
+        {"pattern": "\\bregion\\b", "severity": "warning", "message": "Region-based rules may violate policy"}
+      ]
+    }
+  }
+}
