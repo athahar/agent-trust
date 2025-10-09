@@ -70,7 +70,7 @@ router.post('/', async (req, res) => {
 
   newRule.description = description;
 
-  const { error } = await supabase.from('fraud_rules').insert(newRule);
+  const { error } = await supabase.from('atd_fraud_rules').insert(newRule);
   if (error) return res.status(500).json({ error });
   res.json({ success: true });
 });
@@ -80,7 +80,7 @@ router.get('/:id/matches', async (req, res) => {
     const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
   
     const { data, error } = await supabase
-      .from('transactions')
+      .from('atd_transactions')
       .select('id, amount, user_id, timestamp, status')
       .contains('matched_rules', [ruleId])
       .gte('timestamp', since)
@@ -88,7 +88,7 @@ router.get('/:id/matches', async (req, res) => {
       .limit(10);
   
     const { count, countError } = await supabase
-      .from('transactions')
+      .from('atd_transactions')
       .select('id', { count: 'exact', head: true })
       .contains('matched_rules', [ruleId])
       .gte('timestamp', since);
@@ -104,7 +104,7 @@ router.get('/:id/matches', async (req, res) => {
 router.post('/:id/demote', async (req, res) => {
   const id = req.params.id;
   const { error } = await supabase
-    .from('fraud_rules')
+    .from('atd_fraud_rules')
     .update({ enabled: false })
     .eq('id', id);
 

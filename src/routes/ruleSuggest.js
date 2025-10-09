@@ -171,7 +171,7 @@ router.post('/suggest', async (req, res) => {
     // 8. Save suggestion to database
     console.log('[SUGGEST] Step 7: Saving suggestion to database...');
     const { data: suggestion, error: suggestionError } = await supabase
-      .from('rule_suggestions')
+      .from('atd_rule_suggestions')
       .insert({
         status: 'pending',
         instruction,
@@ -295,7 +295,7 @@ router.get('/suggest/:id', async (req, res) => {
 
   try {
     const { data: suggestion, error } = await supabase
-      .from('rule_suggestions')
+      .from('atd_rule_suggestions')
       .select('*')
       .eq('id', id)
       .single();
@@ -338,7 +338,7 @@ router.get('/suggest', async (req, res) => {
 
   try {
     let query = supabase
-      .from('rule_suggestions')
+      .from('atd_rule_suggestions')
       .select('*', { count: 'exact' })
       .order('created_at', { ascending: false })
       .limit(parseInt(limit))

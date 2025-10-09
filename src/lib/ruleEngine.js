@@ -10,7 +10,7 @@ export async function getCachedRules() {
   const now = Date.now();
   if (!cachedRules || !lastFetched || now - lastFetched > RULE_CACHE_DURATION_MS) {
     console.log('🔄 Fetching fresh rules from Supabase');
-    const { data, error } = await supabase.from('fraud_rules').select('*');
+    const { data, error } = await supabase.from('atd_fraud_rules').select('*');
     if (error) throw new Error('Failed to fetch rules: ' + error.message);
     cachedRules = data;
     lastFetched = now;

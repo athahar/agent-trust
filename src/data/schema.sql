@@ -8,7 +8,7 @@ SELECT
     fr.*,
     creator.name as created_by_name,
     approver.name as approved_by_name
-FROM fraud_rules fr
-LEFT JOIN users creator ON fr.created_by = creator.user_id
-LEFT JOIN users approver ON fr.approved_by = approver.user_id
+FROM atd_fraud_rules fr
+LEFT JOIN atd_users creator ON fr.created_by = creator.user_id
+LEFT JOIN atd_users approver ON fr.approved_by = approver.user_id
 ORDER BY fr.priority; 

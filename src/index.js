@@ -35,7 +35,7 @@ let userPool = [], userMap = {};
     }
 
     const { data: users, error } = await supabase
-      .from('users')
+      .from('atd_users')
       .select('user_id, name');
 
     if (error) {
@@ -72,7 +72,7 @@ app.get('/stream', (req, res) => {
       await runFraudCheckAndPersist(txn);
 
       const { data, error } = await supabase
-        .from('transactions')
+        .from('atd_transactions')
         .select('*, users(name)')
         .eq('txn_id', txn.txn_id)
         .single();
@@ -135,7 +135,7 @@ app.post('/api/eval', async (req, res) => {
     await runFraudCheckAndPersist(txn);
 
     const { data, error } = await supabase
-      .from('transactions')
+      .from('atd_transactions')
       .select('*, users(name)')
       .eq('txn_id', txn.txn_id)
       .single();
@@ -165,7 +165,7 @@ app.post('/api/rules', async (req, res) => {
   }
 
   const { data, error } = await supabase
-    .from('fraud_rules')
+    .from('atd_fraud_rules')
     .update({
       rule: rule.rule,
       decision: rule.decision,
@@ -180,7 +180,7 @@ app.post('/api/rules', async (req, res) => {
 
 app.get('/api/samples', async (req, res) => {
   const { data, error } = await supabase
-    .from('sample_transactions')
+    .from('atd_sample_transactions')
     .select('*')
     .order('created_at', { ascending: false });
   if (error) return res.status(500).json({ error: error.message });
@@ -194,14 +194,14 @@ app.post('/api/samples', async (req, res) => {
   }
 
   const { error } = await supabase
-    .from('sample_transactions')
+    .from('atd_sample_transactions')
     .insert([{ name, description, txn }]);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });
 });
 
 app.get('/api/rule-stats', async (req, res) => {
-  const { data, error } = await supabase.from('rule_trigger_counts').select('*');
+  const { data, error } = await supabase.from('atd_rule_trigger_counts').select('*');
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });

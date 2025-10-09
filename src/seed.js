@@ -29,7 +29,7 @@ async function seed() {
     name,
     risk_profile: faker.number.int({ min: 20, max: 80 })
   }));
-  await supabase.from('users').upsert(users);
+  await supabase.from('atd_users').upsert(users);
 
   // 2) Seed one transaction per merchant per user
   const BATCH_SIZE = 200;
@@ -68,14 +68,14 @@ async function seed() {
       });
 
       if (batch.length >= BATCH_SIZE) {
-        await supabase.from('transactions').insert(batch);
+        await supabase.from('atd_transactions').insert(batch);
         batch = [];
       }
     }
   }
 
   if (batch.length) {
-    await supabase.from('transactions').insert(batch);
+    await supabase.from('atd_transactions').insert(batch);
   }
 
   console.log('✅ Seed complete');

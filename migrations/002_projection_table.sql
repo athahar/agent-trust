@@ -59,7 +59,7 @@ ON transactions_proj (timestamp DESC, device);
 
 -- Backfill projection table from existing transactions
 -- Run this once after creating the table:
--- INSERT INTO transactions_proj (txn_id, timestamp, amount, hour, device, agent_id, partner, intent, decision, flagged, disputed, declined, account_age_days, is_first_transaction)
+-- INSERT INTO atd_transactions_proj (txn_id, timestamp, amount, hour, device, agent_id, partner, intent, decision, flagged, disputed, declined, account_age_days, is_first_transaction)
 -- SELECT
 --   txn_id,
 --   timestamp,
@@ -75,7 +75,7 @@ ON transactions_proj (timestamp DESC, device);
 --   declined,
 --   account_age_days,
 --   is_first_transaction
--- FROM transactions
+-- FROM atd_transactions
 -- WHERE timestamp >= NOW() - INTERVAL '90 days'
 -- ORDER BY timestamp DESC
 -- LIMIT 1000000;
@@ -88,7 +88,7 @@ ON transactions_proj (timestamp DESC, device);
 CREATE OR REPLACE FUNCTION sync_to_projection()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO transactions_proj (
+  INSERT INTO atd_transactions_proj (
     txn_id, timestamp, amount, hour, device, agent_id, partner, intent,
     decision, flagged, disputed, declined, account_age_days, is_first_transaction
   ) VALUES (
@@ -139,7 +139,7 @@ CREATE TRIGGER trg_sync_to_projection
 
 -- After backfilling, verify query performance:
 -- EXPLAIN ANALYZE
--- SELECT * FROM transactions_proj
+-- SELECT * FROM atd_transactions_proj
 -- WHERE timestamp >= NOW() - INTERVAL '30 days'
 -- ORDER BY timestamp DESC
 -- LIMIT 50000;

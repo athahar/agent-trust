@@ -13,7 +13,7 @@ async function backfill() {
 
   // 1) Fetch all users
   const { data: users, error: usersErr } = await supabase
-    .from('users')
+    .from('atd_users')
     .select('user_id');
   if (usersErr) throw usersErr;
 
@@ -60,7 +60,7 @@ async function backfill() {
       : 50;
 
     const { error: userErr } = await supabase
-      .from('users')
+      .from('atd_users')
       .update({ risk_profile: newRisk })
       .eq('user_id', u.user_id);
     if (userErr) throw userErr;

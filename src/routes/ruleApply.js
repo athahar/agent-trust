@@ -64,7 +64,7 @@ router.post('/apply', async (req, res) => {
   try {
     // 2. Fetch suggestion from database
     const { data: suggestion, error: fetchError } = await supabase
-      .from('rule_suggestions')
+      .from('atd_rule_suggestions')
       .select('*')
       .eq('id', suggestion_id)
       .single();
@@ -133,7 +133,7 @@ router.post('/apply', async (req, res) => {
     const ruleFingerprint = hashRule(proposedRule);
 
     const { data: newRule, error: insertError } = await supabase
-      .from('fraud_rules')
+      .from('atd_fraud_rules')
       .insert({
         ruleset_name: proposedRule.ruleset_name,
         description: proposedRule.description || '',
@@ -156,7 +156,7 @@ router.post('/apply', async (req, res) => {
 
     // 7. Create rule version record
     const { data: version, error: versionError } = await supabase
-      .from('rule_versions')
+      .from('atd_rule_versions')
       .insert({
         rule_id: newRule.id,
         version: 1,
@@ -176,7 +176,7 @@ router.post('/apply', async (req, res) => {
     if (versionError) {
       console.error('[APPLY] Failed to create version:', versionError);
       // Rollback rule creation
-      await supabase.from('fraud_rules').delete().eq('id', newRule.id);
+      await supabase.from('atd_fraud_rules').delete().eq('id', newRule.id);
       throw new Error(`Failed to create version: ${versionError.message}`);
     }
 
@@ -184,7 +184,7 @@ router.post('/apply', async (req, res) => {
 
     // 8. Update suggestion status
     const { error: updateError } = await supabase
-      .from('rule_suggestions')
+      .from('atd_rule_suggestions')
       .update({
         status: 'approved',
         approved_by: approver,
@@ -282,7 +282,7 @@ router.post('/reject', async (req, res) => {
   try {
     // Update suggestion status
     const { data: suggestion, error } = await supabase
-      .from('rule_suggestions')
+      .from('atd_rule_suggestions')
       .update({
         status: 'rejected',
         approved_by: reviewer, // Track who rejected it

@@ -39,7 +39,7 @@ export async function sampleTransactions(sampleSize = 50000) {
 
     // Strata 1: Recent (last 30 days)
     const { data: recentData, error: recentError } = await supabase
-      .from('transactions_proj')
+      .from('atd_transactions_proj')
       .select('*')
       .gte('timestamp', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
       .order('timestamp', { ascending: false })
@@ -50,7 +50,7 @@ export async function sampleTransactions(sampleSize = 50000) {
 
     // Strata 2: Weekend (hour 0-9 or 18-23, or Sat/Sun)
     const { data: weekendData, error: weekendError } = await supabase
-      .from('transactions_proj')
+      .from('atd_transactions_proj')
       .select('*')
       .or('hour.lt.9,hour.gte.18')
       .order('timestamp', { ascending: false })
@@ -61,7 +61,7 @@ export async function sampleTransactions(sampleSize = 50000) {
 
     // Strata 3: Flagged
     const { data: flaggedData, error: flaggedError } = await supabase
-      .from('transactions_proj')
+      .from('atd_transactions_proj')
       .select('*')
       .eq('flagged', true)
       .order('timestamp', { ascending: false })
@@ -72,7 +72,7 @@ export async function sampleTransactions(sampleSize = 50000) {
 
     // Strata 4: High-value (>$5k)
     const { data: highValueData, error: highValueError } = await supabase
-      .from('transactions_proj')
+      .from('atd_transactions_proj')
       .select('*')
       .gte('amount', 5000)
       .order('amount', { ascending: false })
@@ -84,7 +84,7 @@ export async function sampleTransactions(sampleSize = 50000) {
     // Strata 5: Random
     // Note: Supabase doesn't have RANDOM() out of box, use offset trick
     const { count: totalCount } = await supabase
-      .from('transactions_proj')
+      .from('atd_transactions_proj')
       .select('*', { count: 'exact', head: true });
 
     if (totalCount) {
@@ -95,7 +95,7 @@ export async function sampleTransactions(sampleSize = 50000) {
 
       for (const offset of randomOffsets) {
         const { data: randomRow } = await supabase
-          .from('transactions_proj')
+          .from('atd_transactions_proj')
           .select('*')
           .range(offset, offset)
           .limit(1);

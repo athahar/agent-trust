@@ -68,20 +68,20 @@ ON fraud_rules (category);
 
 -- 1. Dry-run time-range query (should use idx_transactions_timestamp)
 -- EXPLAIN ANALYZE
--- SELECT * FROM transactions
+-- SELECT * FROM atd_transactions
 -- WHERE timestamp >= NOW() - INTERVAL '30 days'
 -- ORDER BY timestamp DESC
 -- LIMIT 50000;
 
 -- 2. Overlap query (should use idx_transactions_triggered_rule_ids)
 -- EXPLAIN ANALYZE
--- SELECT txn_id FROM transactions
+-- SELECT txn_id FROM atd_transactions
 -- WHERE fraud_engine_output->'triggered_rule_ids' @> '[123]'::jsonb
 -- LIMIT 5000;
 
 -- 3. Risk decision filter (should use idx_transactions_risk_decision)
 -- EXPLAIN ANALYZE
--- SELECT COUNT(*) FROM transactions
+-- SELECT COUNT(*) FROM atd_transactions
 -- WHERE fraud_engine_output->>'risk_decision' = 'block';
 
 -- Expected: All queries should show "Index Scan" or "Bitmap Index Scan", NOT "Seq Scan"

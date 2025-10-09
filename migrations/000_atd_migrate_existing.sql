@@ -20,11 +20,11 @@ BEGIN
   FROM information_schema.tables
   WHERE table_schema = 'public'
     AND table_name IN (
-      'users',
-      'risk_users',
-      'fraud_rules',
-      'transactions',
-      'sample_transactions',
+      'atd_users',
+      'atd_risk_users',
+      'atd_fraud_rules',
+      'atd_transactions',
+      'atd_sample_transactions',
       'rule_trigger_counts'
     );
 
@@ -32,11 +32,11 @@ BEGIN
   SELECT ARRAY_AGG(table_name)
   INTO missing_tables
   FROM (VALUES
-    ('users'),
-    ('risk_users'),
-    ('fraud_rules'),
-    ('transactions'),
-    ('sample_transactions'),
+    ('atd_users'),
+    ('atd_risk_users'),
+    ('atd_fraud_rules'),
+    ('atd_transactions'),
+    ('atd_sample_transactions'),
     ('rule_trigger_counts')
   ) AS t(table_name)
   WHERE NOT EXISTS (
@@ -252,8 +252,8 @@ DECLARE
   txns_count INTEGER;
   samples_count INTEGER;
 BEGIN
-  SELECT COUNT(*) INTO users_count FROM atd_users;
-  SELECT COUNT(*) INTO risk_users_count FROM atd_risk_users;
+  SELECT COUNT(*) INTO atd_users_count FROM atd_users;
+  SELECT COUNT(*) INTO atd_risk_users_count FROM atd_risk_users;
   SELECT COUNT(*) INTO rules_count FROM atd_fraud_rules;
   SELECT COUNT(*) INTO txns_count FROM atd_transactions;
   SELECT COUNT(*) INTO samples_count FROM atd_sample_transactions;

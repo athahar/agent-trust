@@ -97,7 +97,7 @@ export const RULE_VALIDATION_SCHEMA = {
     },
     applies_to: {
       type: "string",
-      default: "transactions"
+      default: "atd_transactions"
     }
   }
 };

@@ -24,7 +24,7 @@ async function backfillProjection() {
   try {
     // 1. Count existing transactions
     const { count: totalCount, error: countError } = await supabase
-      .from('transactions')
+      .from('atd_transactions')
       .select('*', { count: 'exact', head: true });
 
     if (countError) throw countError;
@@ -39,7 +39,7 @@ async function backfillProjection() {
       console.log(`\n📦 Fetching batch ${offset / batchSize + 1} (rows ${offset + 1}-${Math.min(offset + batchSize, totalCount)})...`);
 
       const { data: transactions, error: fetchError } = await supabase
-        .from('transactions')
+        .from('atd_transactions')
         .select('*')
         .range(offset, offset + batchSize - 1)
         .order('created_at', { ascending: true });
@@ -84,7 +84,7 @@ async function backfillProjection() {
 
       // 4. Insert into projection table (upsert to handle re-runs)
       const { error: insertError } = await supabase
-        .from('transactions_proj')
+        .from('atd_transactions_proj')
         .upsert(projectionRows, { onConflict: 'txn_id' });
 
       if (insertError) {
@@ -100,7 +100,7 @@ async function backfillProjection() {
 
     // 5. Verify backfill
     const { count: projCount, error: projCountError } = await supabase
-      .from('transactions_proj')
+      .from('atd_transactions_proj')
       .select('*', { count: 'exact', head: true });
 
     if (projCountError) throw projCountError;
@@ -118,7 +118,7 @@ async function backfillProjection() {
     // 6. Sample verification
     console.log(`\n🔍 Verifying sample rows...`);
     const { data: sample, error: sampleError } = await supabase
-      .from('transactions_proj')
+      .from('atd_transactions_proj')
       .select('*')
       .limit(5)
       .order('timestamp', { ascending: false });

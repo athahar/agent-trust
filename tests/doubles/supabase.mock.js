@@ -7,7 +7,7 @@
  *
  * Usage:
  *   const supabase = createMockSupabase({ transactions: [...], rules: [...] });
- *   const { data } = await supabase.from('transactions').select('*').eq('amount', 1000);
+ *   const { data } = await supabase.from('atd_transactions').select('*').eq('amount', 1000);
  */
 
 export class MockSupabaseQuery {

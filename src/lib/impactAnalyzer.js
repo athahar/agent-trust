@@ -108,7 +108,7 @@ export async function stratifiedSample(filters = {}, sampleSize = 10000) {
   ]);
 
   const { data: recent, error: recentError } = await supabase
-    .rpc('sample_transactions', {
+    .rpc('atd_sample_transactions', {
       where_clause: recentWhere,
       sample_limit: recentSize
     });
@@ -125,7 +125,7 @@ export async function stratifiedSample(filters = {}, sampleSize = 10000) {
   ]);
 
   const { data: weekend, error: weekendError } = await supabase
-    .rpc('sample_transactions', {
+    .rpc('atd_sample_transactions', {
       where_clause: weekendWhere,
       sample_limit: weekendSize
     });
@@ -142,7 +142,7 @@ export async function stratifiedSample(filters = {}, sampleSize = 10000) {
   ]);
 
   const { data: flagged, error: flaggedError } = await supabase
-    .rpc('sample_transactions', {
+    .rpc('atd_sample_transactions', {
       where_clause: flaggedWhere,
       sample_limit: flaggedSize
     });
@@ -159,7 +159,7 @@ export async function stratifiedSample(filters = {}, sampleSize = 10000) {
   ]);
 
   const { data: highValue, error: highValueError } = await supabase
-    .rpc('sample_transactions', {
+    .rpc('atd_sample_transactions', {
       where_clause: highValueWhere,
       sample_limit: highValueSize
     });
@@ -175,7 +175,7 @@ export async function stratifiedSample(filters = {}, sampleSize = 10000) {
   ]);
 
   const { data: random, error: randomError } = await supabase
-    .rpc('sample_transactions', {
+    .rpc('atd_sample_transactions', {
       where_clause: randomWhere,
       sample_limit: randomSize
     });
@@ -201,7 +201,7 @@ export async function stratifiedSample(filters = {}, sampleSize = 10000) {
  */
 async function simpleSample(filters = {}, sampleSize = 10000) {
   let query = supabase
-    .from('transactions_proj')
+    .from('atd_transactions_proj')
     .select('*')
     .order('timestamp', { ascending: false })
     .limit(sampleSize);
@@ -365,7 +365,7 @@ export async function dryRunWithBaseline(proposedRule, options = {}) {
 export async function overlapAgainstExisting(proposedMatches, existingRuleId) {
   // Get transactions matched by existing rule (from triggered_rule_ids in fraud_engine_output)
   const { data: existingMatches, error } = await supabase
-    .from('transactions')
+    .from('atd_transactions')
     .select('txn_id')
     .contains('fraud_engine_output->triggered_rule_ids', [existingRuleId])
     .limit(50000);
@@ -403,7 +403,7 @@ export async function overlapAgainstExisting(proposedMatches, existingRuleId) {
 export async function overlapWithAllRules(proposedMatches) {
   // Get all enabled rules
   const { data: enabledRules, error } = await supabase
-    .from('fraud_rules')
+    .from('atd_fraud_rules')
     .select('id, ruleset_name, category')
     .eq('enabled', true);
 

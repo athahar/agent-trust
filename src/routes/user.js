@@ -8,7 +8,7 @@ const router = express.Router();
 router.get('/:userId/summary', async (req, res) => {
   const { userId } = req.params;
   const { data, error } = await supabase
-    .from('users')
+    .from('atd_users')
     .select('user_id, name, risk_profile')
     .eq('user_id', userId)
     .single();
@@ -33,7 +33,7 @@ router.get('/:userId/agents', async (req, res) => {
 router.get('/user/:userId/transactions', async (req, res) => {
     const { userId } = req.params;
     const { data, error } = await supabase
-      .from('transactions')
+      .from('atd_transactions')
       .select('*') // include fraud_engine_output
       .eq('user_id', userId)
       .order('timestamp', { ascending: false });
@@ -48,7 +48,7 @@ router.get('/:userId/agent/:agentId/transactions', async (req, res) => {
     const { userId, agentId } = req.params;
   
     const { data, error } = await supabase
-      .from('transactions')
+      .from('atd_transactions')
       .select('*')
       .eq('user_id', userId)
       .eq('agent_id', agentId)
@@ -81,7 +81,7 @@ router.get('/:userId/agent/:agentId/transactions', async (req, res) => {
 router.get('/simulate/:userId', async (req, res) => {
   const { userId } = req.params;
   const { data, error } = await supabase
-    .from('transactions')
+    .from('atd_transactions')
     .select('*')
     .eq('user_id', userId)
     .order('timestamp', { ascending: false })

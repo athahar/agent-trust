@@ -57,7 +57,7 @@ export async function runFraudCheckAndPersist(txn, engineVersion = 'v1.2.3') {
   };
 
   const { data, error } = await supabase
-    .from('transactions')
+    .from('atd_transactions')
     .upsert([payload], { onConflict: 'txn_id' });
 
   if (error) {
