@@ -1,361 +1,597 @@
-# Sprint 2: Integration Tests + Dry-Run Implementation
+# Sprint 2: Dry-Run + Overlap Analysis
 
 **Status:** 📋 Planning
-**Duration:** 5-7 days
+**Duration:** 5-7 days (40-56 hours)
 **Prerequisites:** Sprint 1 complete (77/77 tests passing)
 
 ---
 
-## Goals
+## 🎯 Goals
 
-1. **Implement dry-run impact analysis** (core feature)
-2. **Add integration tests** using mocks (raise test count to 100+)
-3. **Complete contract test coverage** with Supabase/OpenAI mocks
-4. **Add rule linter** to catch logical errors
-5. **Performance optimization** for 50k transaction dry-runs
-
----
-
-## Sprint 2 Deliverables
-
-### A. Dry-Run Implementation (Days 1-3)
-
-**Impact Analyzer Core** (`src/lib/impactAnalyzer.js` - already exists but needs completion)
-
-**Features to implement:**
-1. **Stratified Sampling**
-   - 5 strata: recent (20%), weekend (20%), flagged (20%), high-value (20%), random (20%)
-   - Ensures representative sample across time/risk/value dimensions
-   - Target: 50k transactions < 2s (p95)
-
-2. **Baseline vs Proposed Comparison**
-   ```javascript
-   {
-     sample_size: 50000,
-     matches: 237,
-     match_rate: "0.47%",
-     baseline_rates: { block: "1.2%", review: "5.3%", allow: "93.5%" },
-     proposed_rates: { block: "1.2%", review: "5.77%", allow: "93.03%" },
-     deltas: { block: "+0.0%", review: "+0.47%", allow: "-0.47%" },
-     false_positive_risk: "low" // heuristic based on unflagged matches
-   }
-   ```
-
-3. **Change Examples (PII-Stripped)**
-   - Top 10 transactions affected by new rule
-   - Show: txn_id, amount, device, hour, current_decision → new_decision
-   - Strip PII: user_id → "[REDACTED]", seller_name → "[REDACTED]"
-
-4. **Performance Optimization**
-   - Use `transactions_proj` table (lean columns, no JSON parsing)
-   - Parallel rule evaluation (Promise.all for multiple rules)
-   - Query optimization with EXPLAIN ANALYZE
-   - Target: 50k transactions evaluated in < 2s
-
-**Files:**
-- `src/lib/impactAnalyzer.js` (enhance existing)
-- `tests/integration/impactAnalyzer.test.js` (new)
+Enable analysts to **preview impact** before deploying a rule by:
+1. **Dry-run on historical data** (baseline vs proposed comparison)
+2. **Overlap analysis** (detect redundancy with existing rules)
+3. **UI integration** (display results in rules dashboard)
+4. **Test coverage with mocks** (fast, reliable CI without real API calls)
 
 ---
 
-### B. Rule Linter (Days 1-2)
+## 📦 Sprint 2 Deliverables
 
-**Linter Implementation** (`src/lib/linter.js` - new)
+### Phase 2A: Database Migrations (Day 1, 4-6 hours)
 
-**Detects:**
-1. **Always-true conditions**
-   ```javascript
-   // Bad: amount > 0 (always true since catalog min is 0)
-   // Lint: "Condition 'amount > 0' is always true (min: 0)"
-   ```
+**Create database infrastructure for dry-run:**
 
-2. **Always-false conditions**
-   ```javascript
-   // Bad: amount > 1000000 (max is 1000000)
-   // Lint: "Condition 'amount > 1000000' is always false (max: 1000000)"
-   ```
+#### 1. Projection Table (`migrations/004_transactions_proj.sql`)
 
-3. **Contradictions**
-   ```javascript
-   // Bad: amount > 5000 AND amount < 1000
-   // Lint: "Contradictory conditions: amount cannot be > 5000 AND < 1000"
-   ```
+```sql
+-- Lean projection table (no fat JSON parsing)
+CREATE TABLE transactions_proj (
+  txn_id VARCHAR(50) PRIMARY KEY,
+  timestamp TIMESTAMPTZ NOT NULL,
+  amount NUMERIC(12,2) NOT NULL,
+  hour INTEGER NOT NULL, -- extracted from timestamp
+  device VARCHAR(20) NOT NULL,
+  agent_id VARCHAR(50),
+  partner VARCHAR(50),
+  intent VARCHAR(50),
+  decision VARCHAR(20) NOT NULL, -- allow/review/block
+  flagged BOOLEAN DEFAULT false,
+  disputed BOOLEAN DEFAULT false,
+  declined BOOLEAN DEFAULT false,
+  account_age_days INTEGER,
+  is_first_transaction BOOLEAN,
+  triggered_rule_ids JSONB DEFAULT '[]'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
-4. **Redundant conditions**
-   ```javascript
-   // Bad: device == "mobile" AND device == "mobile"
-   // Lint: "Duplicate condition: device == 'mobile' appears 2 times"
-   ```
+-- Indexes for fast querying
+CREATE INDEX idx_proj_decision_ts ON transactions_proj(decision, timestamp DESC);
+CREATE INDEX idx_proj_device ON transactions_proj(device);
+CREATE INDEX idx_proj_agent_id ON transactions_proj(agent_id);
+CREATE INDEX idx_proj_amount ON transactions_proj(amount);
+CREATE INDEX idx_proj_flagged ON transactions_proj(flagged) WHERE flagged = true;
+CREATE INDEX idx_proj_triggered ON transactions_proj USING gin(triggered_rule_ids);
+```
 
-5. **Overly complex rules**
-   ```javascript
-   // Bad: 11 conditions (policy max is 10)
-   // Already caught by validator, but linter warns at 7+
-   ```
+**Why:** Lean table = fast queries (50k rows < 2s), no JSON parsing overhead
 
-6. **Broad negations** (already in policy gate)
-   ```javascript
-   // Bad: agent_id != "openai" (allows all others)
-   // Suggest: agent_id in ["anthropic", "gemini", ...] (explicit allow-list)
-   ```
+#### 2. Backfill Script (`scripts/backfillProjection.js`)
 
-**Linter Output:**
 ```javascript
-{
-  warnings: [
-    { type: "always_true", field: "amount", message: "..." },
-    { type: "redundant", field: "device", message: "..." }
-  ],
-  errors: [
-    { type: "contradiction", fields: ["amount"], message: "..." }
-  ],
-  blocking: false // warnings don't block, errors do
+// Backfill transactions_proj from transactions table
+// Run once after migration
+export async function backfillProjection(limit = 100000) {
+  await supabase.rpc('backfill_projection', { row_limit: limit });
 }
 ```
 
-**Files:**
-- `src/lib/linter.js` (new)
-- `tests/unit/linter.test.js` (new, 20+ tests)
-
----
-
-### C. Integration Tests with Mocks (Days 3-5)
-
-**Implement Test Doubles:**
-
-1. **Supabase Mock** (`tests/doubles/supabase.mock.js` - skeleton exists)
-   - In-memory query engine (supports select, where, order, limit)
-   - Fixtures: 1000 sample transactions, 20 sample rules
-   - Helper: `mockSupabase(fixtures)` injects mock before imports
-
-2. **OpenAI Mock** (`tests/doubles/openai.mock.js` - skeleton exists)
-   - Fixture-based responses (10+ pre-defined LLM outputs)
-   - Response mapping by keyword (e.g., "mobile" → mobile_rule_fixture)
-   - Helper: `mockOpenAI(responsesMap)` injects mock
-
-3. **Fixtures** (new)
-   - `tests/doubles/fixtures/llm-responses.json` (10+ valid/invalid rule responses)
-   - `tests/doubles/fixtures/db-transactions.json` (1000 diverse transactions)
-   - `tests/doubles/fixtures/db-rules.json` (20 sample fraud rules)
-
-**Integration Tests:**
-
-1. **API Suggest Endpoint** (`tests/integration/api.suggest.test.js`)
-   ```javascript
-   test('POST /api/rules/suggest - end-to-end with mocks', async () => {
-     // Mock Supabase with fixtures
-     const supabase = mockSupabase({ transactions: [...], rules: [...] });
-
-     // Mock OpenAI with valid response
-     const openai = mockOpenAI({ defaultResponse: validRuleFixture });
-
-     const res = await request(app)
-       .post('/api/rules/suggest')
-       .send({ instruction: 'Review mobile over $10k', actor: 'test@example.com' });
-
-     assert.equal(res.status, 200);
-     assert.ok(res.body.suggestion_id);
-     assert.ok(res.body.impact_analysis.matches > 0);
-     assert.equal(res.body.validation.valid, true);
-   });
-   ```
-
-2. **API Apply Endpoint** (`tests/integration/api.apply.test.js`)
-   - Test two-person rule enforcement
-   - Test DB inserts (rule_versions, audits)
-   - Test approval flow
-
-3. **API Reject Endpoint** (`tests/integration/api.reject.test.js`)
-   - Test suggestion status update
-   - Test audit logging
-
-4. **LLM Client** (`tests/integration/llm.client.test.js`)
-   - Test function calling with mocked responses
-   - Test caching logic
-   - Test error handling (malformed JSON, timeout)
-
-5. **Impact Analyzer** (`tests/integration/impactAnalyzer.test.js`)
-   - Test stratified sampling logic
-   - Test baseline vs proposed calculation
-   - Test PII stripping in change examples
-   - Test performance (50k fixtures < 2s)
-
-**Target:** Add 30+ integration tests (77 → 107+ total)
+**Acceptance Criteria:**
+- [ ] Projection table created with indexes
+- [ ] Backfill script tested on 100k rows
+- [ ] Queries on projection table < 100ms for 50k rows
 
 **Files:**
-- `tests/integration/api.suggest.test.js` (new, 10 tests)
-- `tests/integration/api.apply.test.js` (new, 8 tests)
-- `tests/integration/api.reject.test.js` (new, 5 tests)
-- `tests/integration/llm.client.test.js` (new, 7 tests)
-- `tests/integration/impactAnalyzer.test.js` (new, 10 tests)
+- `migrations/004_transactions_proj.sql` (new)
+- `scripts/backfillProjection.js` (new)
 
 ---
 
-### D. Contract Tests Migration (Day 5)
+### Phase 2B: Dry-Run Engine (Days 1-2, 8-12 hours)
 
-**Migrate existing contract tests to use mocks:**
+**Implement dry-run impact analyzer:**
 
-Currently `tests/contract/api.contract.test.js` is skipped in CI because it requires real DB/LLM.
+#### Core Features:
 
-**Changes:**
-1. Inject Supabase mock at top of file
-2. Inject OpenAI mock at top of file
-3. Update assertions to match mocked responses
-4. Add to CI pipeline (remove from skip list)
+**1. Stratified Sampling** (`src/lib/sampler.js`)
+```javascript
+export async function sampleTransactions(size = 50000) {
+  // 5 strata (20% each):
+  return {
+    recent:    await sampleRecent(size * 0.2),      // last 7 days
+    weekend:   await sampleWeekend(size * 0.2),     // Sat/Sun
+    flagged:   await sampleFlagged(size * 0.2),     // flagged = true
+    highValue: await sampleHighValue(size * 0.2),   // amount > $5k
+    random:    await sampleRandom(size * 0.2)       // uniform random
+  };
+}
+```
 
-**Target:** All contract tests pass with mocks
+**2. Impact Metrics** (`src/lib/dryRunEngine.js`)
+```javascript
+export async function dryRunRule(rule, sampleSize = 50000) {
+  // 1. Get stratified sample
+  const sample = await sampleTransactions(sampleSize);
 
----
+  // 2. Evaluate rule on each transaction
+  const results = sample.map(txn => ({
+    txn_id: txn.txn_id,
+    baseline_decision: txn.decision,
+    proposed_decision: evaluateRule(rule, txn)
+  }));
 
-### E. CI/CD Enhancements (Day 6)
+  // 3. Compute metrics
+  const baseline = computeRates(results, 'baseline_decision');
+  const proposed = computeRates(results, 'proposed_decision');
+  const deltas = computeDeltas(baseline, proposed);
 
-**Update `.github/workflows/test.yml`:**
+  return {
+    sample_size: results.length,
+    matches: results.filter(r => r.proposed_decision !== r.baseline_decision).length,
+    match_rate: matches / results.length,
+    baseline_rates: baseline, // { allow: 0.92, review: 0.05, block: 0.03 }
+    proposed_rates: proposed, // { allow: 0.90, review: 0.07, block: 0.03 }
+    deltas: deltas,           // { review: +2.0%, allow: -2.0% }
+    sample_examples: getTopExamples(results, 10), // top 10 changed txns
+    false_positive_risk: estimateFPRisk(results)
+  };
+}
+```
 
-1. **Add integration test job**
-   ```yaml
-   - name: Run integration tests (with mocks)
-     run: npm run test:integration
-     env:
-       ALLOW_NETWORK_KEYS_FOR_TESTS: true  # Allow mocks to run
-   ```
+**3. Change Examples with PII Stripping** (`src/lib/piiStripper.js`)
+```javascript
+export function stripPII(transactions) {
+  return transactions.map(txn => ({
+    ...txn,
+    user_id: '[REDACTED]',
+    seller_name: '[REDACTED]',
+    // Keep: txn_id, amount, device, hour, decisions
+  }));
+}
+```
 
-2. **Add contract test job** (now that mocks are implemented)
-   ```yaml
-   - name: Run contract tests (with mocks)
-     run: npm run test:contract
-   ```
+**4. Rule Evaluator** (`src/lib/ruleEvaluator.js`)
+```javascript
+export function evaluateRule(rule, transaction) {
+  // Check if all conditions match
+  const allMatch = rule.conditions.every(cond =>
+    evaluateCondition(cond, transaction)
+  );
 
-3. **Performance baseline check** (Sprint 2 Week 2)
-   ```yaml
-   - name: Check performance regressions
-     run: node scripts/checkPerfBaseline.js
-   ```
+  return allMatch ? rule.decision : transaction.decision;
+}
+```
 
-4. **Coverage gates remain strict**
-   - Lines ≥80%, Branches ≥70%
-   - Now includes integration tests
+**Performance Target:** 50k transactions < 2s (p95)
 
----
-
-### F. Documentation Updates (Day 7)
-
-**Update docs with Sprint 2 features:**
-
-1. **SPRINT2_COMPLETE.md** (new)
-   - Dry-run implementation details
-   - Integration test coverage (107+ tests)
-   - Linter rules and examples
-   - Performance benchmarks (50k dry-run < 2s)
-
-2. **CLAUDE.md** (update)
-   - Add integration testing section
-   - Add linter usage examples
-   - Add dry-run API documentation
-
-3. **README_AI_COPILOT.md** (update)
-   - Add dry-run feature to "What Was Built"
-   - Update architecture diagram with dry-run flow
-   - Add linter to "Safety Backbone" section
-
----
-
-## Sprint 2 Acceptance Criteria
-
-### Must Have ✅
+**Acceptance Criteria:**
+- [ ] Stratified sampling returns diverse sample (5 strata)
 - [ ] Dry-run returns baseline vs proposed comparison
-- [ ] Dry-run completes 50k transactions < 2s (p95)
-- [ ] Linter detects always-true, always-false, contradictions
-- [ ] Integration tests pass with mocks (30+ new tests)
-- [ ] Contract tests pass with mocks (migrated from skip)
-- [ ] All 107+ tests pass in CI (unit + fuzz + perf + golden + integration + contract)
-- [ ] Coverage ≥80% lines, ≥70% branches (including new code)
+- [ ] Change examples stripped of PII (user_id, seller_name)
+- [ ] Performance: 50k transactions < 2s on projection table
+- [ ] Unit tests: 10 tests for metric calculations
 
-### Should Have 🎯
-- [ ] PII stripping in change examples
+**Files:**
+- `src/lib/sampler.js` (new)
+- `src/lib/dryRunEngine.js` (new)
+- `src/lib/ruleEvaluator.js` (new)
+- `src/lib/piiStripper.js` (new)
+- `tests/unit/dryRunEngine.test.js` (new, 10 tests)
+
+---
+
+### Phase 2C: Overlap Analyzer (Day 3, 4-6 hours)
+
+**Detect redundancy with existing rules using Jaccard similarity:**
+
+#### Implementation (`src/lib/overlapAnalyzer.js`)
+
+```javascript
+export async function analyzeOverlap(proposedRule, sampleSize = 10000) {
+  // 1. Get sample transactions
+  const sample = await sampleTransactions(sampleSize);
+
+  // 2. Get all active rules
+  const existingRules = await fetchActiveRules();
+
+  // 3. Compute overlap for each existing rule
+  const overlaps = existingRules.map(existingRule => {
+    const proposedMatches = sample.filter(txn => evaluateRule(proposedRule, txn));
+    const existingMatches = sample.filter(txn => evaluateRule(existingRule, txn));
+
+    const intersection = proposedMatches.filter(txn =>
+      existingMatches.includes(txn)
+    );
+    const union = [...new Set([...proposedMatches, ...existingMatches])];
+
+    const jaccard = intersection.length / union.length;
+
+    return {
+      rule_id: existingRule.id,
+      rule_name: existingRule.ruleset_name,
+      jaccard_score: jaccard,
+      overlap_pct: (jaccard * 100).toFixed(1) + '%',
+      intersection_count: intersection.length,
+      proposed_matches: proposedMatches.length,
+      existing_matches: existingMatches.length
+    };
+  });
+
+  // 4. Return top 5 by Jaccard score
+  return overlaps
+    .sort((a, b) => b.jaccard_score - a.jaccard_score)
+    .slice(0, 5);
+}
+```
+
+**Output Example:**
+```json
+{
+  "top_overlaps": [
+    {
+      "rule_id": 42,
+      "rule_name": "high-value-mobile",
+      "jaccard_score": 0.87,
+      "overlap_pct": "87.0%",
+      "intersection_count": 435,
+      "proposed_matches": 500,
+      "existing_matches": 500,
+      "recommendation": "High overlap - consider merging or disabling one"
+    }
+  ]
+}
+```
+
+**Performance Target:** 10k sample, 20 existing rules → < 500ms
+
+**Acceptance Criteria:**
+- [ ] Overlap analysis returns top 5 rules by Jaccard score
+- [ ] Jaccard calculation correct (intersection / union)
+- [ ] Performance: 10k sample + 20 rules < 500ms
+- [ ] Unit tests: 5 tests for Jaccard calculation
+
+**Files:**
+- `src/lib/overlapAnalyzer.js` (new)
+- `tests/unit/overlapAnalyzer.test.js` (new, 5 tests)
+
+---
+
+### Phase 2D: API Endpoints (Day 4, 6-8 hours)
+
+**Expose dry-run and overlap via REST API:**
+
+#### 1. Dry-Run Endpoint (`src/routes/ruleDryRun.js`)
+
+```javascript
+import express from 'express';
+import { dryRunRule } from '../lib/dryRunEngine.js';
+import { analyzeOverlap } from '../lib/overlapAnalyzer.js';
+import { RuleValidator } from '../lib/ruleValidator.js';
+import { policyGate } from '../lib/policyGate.js';
+
+const router = express.Router();
+
+router.post('/api/rules/dryrun', async (req, res) => {
+  const { rule, sample_size = 50000 } = req.body;
+
+  // 1. Validate rule structure
+  const validator = new RuleValidator();
+  const validation = validator.validate(rule);
+  if (!validation.valid) {
+    return res.status(400).json({ error: 'Validation failed', validation });
+  }
+
+  // 2. Policy gate
+  const violations = policyGate({ ruleset: { rules: [rule] } });
+  if (violations.some(v => v.severity === 'error')) {
+    return res.status(400).json({ error: 'Policy violation', violations });
+  }
+
+  // 3. Run dry-run
+  const impact = await dryRunRule(rule, sample_size);
+
+  // 4. Analyze overlap
+  const overlap = await analyzeOverlap(rule, Math.min(sample_size, 10000));
+
+  // 5. Audit log
+  await auditLog({
+    action: 'dryrun',
+    actor: req.body.actor || 'unknown',
+    rule,
+    impact,
+    overlap
+  });
+
+  res.json({
+    validation,
+    impact,
+    overlap,
+    timestamp: new Date().toISOString()
+  });
+});
+
+export default router;
+```
+
+#### 2. Overlap Endpoint (Helper) (`src/routes/ruleOverlap.js`)
+
+```javascript
+// Optional: dedicated overlap endpoint for manual comparisons
+router.post('/api/rules/overlap', async (req, res) => {
+  const { rule, sample_size = 10000 } = req.body;
+  const overlap = await analyzeOverlap(rule, sample_size);
+  res.json({ overlap });
+});
+```
+
+**Acceptance Criteria:**
+- [ ] POST /api/rules/dryrun returns impact + overlap
+- [ ] Validation + policy gate enforced before dry-run
+- [ ] Audit logging for all dry-run calls
+- [ ] Integration tests: 5 tests (happy path, validation fail, policy fail, etc.)
+
+**Files:**
+- `src/routes/ruleDryRun.js` (new)
+- `src/routes/ruleOverlap.js` (optional, new)
+- `tests/integration/api.dryrun.test.js` (new, 5 tests)
+
+---
+
+### Phase 2E: UI Integration (Day 5, 6-8 hours)
+
+**Display dry-run results in rules.html:**
+
+#### UI Changes:
+
+**1. Add "🧪 Dry Run" Button**
+```html
+<!-- In rules.html, after "AI Suggest" button -->
+<button id="dryRunBtn" class="btn-secondary">
+  🧪 Dry Run
+</button>
+```
+
+**2. Dry-Run Modal** (`public/js/dryRunModal.js`)
+```javascript
+function showDryRunResults(data) {
+  const { impact, overlap } = data;
+
+  // Display impact metrics
+  renderImpactMetrics(impact); // baseline vs proposed rates, deltas
+
+  // Display overlap warnings
+  renderOverlapWarnings(overlap); // top 5 overlapping rules
+
+  // Display change examples
+  renderChangeExamples(impact.sample_examples); // 10 affected txns
+
+  // Show accept/retry/discard buttons
+  renderActionButtons();
+}
+```
+
+**3. Visual Components:**
+- **Impact Chart:** Bar chart showing baseline vs proposed rates
+- **Overlap Table:** Top 5 rules with Jaccard scores
+- **Change Examples Table:** Affected transactions (PII-stripped)
+- **Action Buttons:** Accept (save rule), Retry (tweak), Discard
+
+**Acceptance Criteria:**
+- [ ] "🧪 Dry Run" button visible in rules.html
+- [ ] Modal displays impact metrics, overlaps, examples
+- [ ] Visual feedback (spinner during dry-run, error states)
+- [ ] Action buttons work (accept → save rule, discard → close)
+
+**Files:**
+- `public/rules.html` (update)
+- `public/js/dryRunModal.js` (new)
+- `public/css/dryRun.css` (new)
+
+---
+
+### Phase 2F: Test Doubles & Integration Tests (Days 5-6, 10-12 hours)
+
+**Add mocks for CI (no real DB/LLM calls):**
+
+#### 1. Minimal Mock Setup
+
+**Supabase Fixtures** (`tests/doubles/fixtures/db-transactions.json`)
+```json
+[
+  {
+    "txn_id": "tx_00001",
+    "amount": 12000,
+    "device": "mobile",
+    "hour": 22,
+    "decision": "allow",
+    "flagged": false
+  },
+  // ... 1000 diverse transactions
+]
+```
+
+**OpenAI Fixtures** (`tests/doubles/fixtures/llm-responses.json`)
+```json
+{
+  "valid_mobile_rule": {
+    "function_call": {
+      "name": "generate_fraud_rule",
+      "arguments": "{\"ruleset_name\":\"high-value-mobile\", ...}"
+    }
+  }
+}
+```
+
+#### 2. Integration Tests
+
+**Dry-Run API** (`tests/integration/api.dryrun.test.js`)
+```javascript
+test('POST /api/rules/dryrun - returns impact + overlap', async () => {
+  // Mock Supabase with 1000 fixtures
+  mockSupabase({ transactions: fixtures.transactions });
+
+  const res = await request(app)
+    .post('/api/rules/dryrun')
+    .send({ rule: validRule, sample_size: 1000 });
+
+  assert.equal(res.status, 200);
+  assert.ok(res.body.impact.matches);
+  assert.ok(res.body.overlap.top_overlaps);
+});
+```
+
+**Target:** Add 15 integration tests (77 → 92 total)
+
+**Acceptance Criteria:**
+- [ ] 15+ integration tests pass with mocks
+- [ ] No real DB/LLM calls in CI (env-key guard enforced)
+- [ ] Tests run in < 30s (fast, deterministic)
+
+**Files:**
+- `tests/doubles/fixtures/db-transactions.json` (new, 1000 rows)
+- `tests/doubles/fixtures/llm-responses.json` (new)
+- `tests/integration/api.dryrun.test.js` (new, 5 tests)
+- `tests/integration/dryRunEngine.test.js` (new, 5 tests)
+- `tests/integration/overlapAnalyzer.test.js` (new, 5 tests)
+
+---
+
+### Phase 2G: CI & Documentation (Day 7, 4-6 hours)
+
+#### 1. CI Enhancements (`.github/workflows/test.yml`)
+
+```yaml
+- name: Run integration tests (with mocks)
+  run: npm run test:integration
+  env:
+    ALLOW_NETWORK_KEYS_FOR_TESTS: true
+
+- name: Run performance tests
+  run: npm run test:perf
+
+- name: Check performance baseline
+  run: node scripts/checkPerfBaseline.js
+```
+
+#### 2. Documentation
+
+**Create SPRINT2_COMPLETE.md:**
+- Dry-run implementation summary
+- Overlap analysis details
+- Performance benchmarks (50k < 2s)
+- Test coverage (92 tests)
+
+**Update CLAUDE.md:**
+- Add dry-run testing section
+- Add overlap analysis usage
+
+**Update README_AI_COPILOT.md:**
+- Add dry-run to "What Was Built"
+- Update architecture diagram
+
+**Acceptance Criteria:**
+- [ ] CI runs all tests (unit + fuzz + perf + golden + integration)
+- [ ] Performance baseline check passes
+- [ ] Documentation complete
+
+---
+
+## ✅ Sprint 2 Acceptance Criteria
+
+### Must Have (Blocking)
+- [ ] **Dry-run** returns baseline vs proposed comparison
+- [ ] **Dry-run** completes 50k transactions < 2s (p95)
+- [ ] **Overlap analysis** returns top 5 rules with Jaccard scores
+- [ ] **UI** displays dry-run results (impact + overlap + examples)
+- [ ] **Integration tests** pass with mocks (15+ new tests)
+- [ ] **Total tests:** 92+ passing (77 + 15 integration)
+- [ ] **Coverage:** ≥80% lines, ≥70% branches
+- [ ] **CI** fully green with no real API calls
+
+### Should Have (High Priority)
 - [ ] Stratified sampling (5 strata)
+- [ ] PII stripping in change examples
 - [ ] False positive risk heuristic
-- [ ] Linter warnings shown in UI
 - [ ] Performance baseline check in CI
+- [ ] Audit logging for all dry-runs
 
-### Nice to Have 💡
-- [ ] Overlap analysis (Jaccard similarity with existing rules)
-- [ ] Rule explanation (LLM generates human-readable summary)
-- [ ] Async dry-run with SSE progress updates
-
----
-
-## Risk Mitigation
-
-### Risk 1: Dry-run too slow (> 2s for 50k)
-**Mitigation:**
-- Use `transactions_proj` table (no JSON parsing)
-- Add compound indexes on frequently queried columns
-- Run EXPLAIN ANALYZE on dry-run queries
-- Cache rule compilation results
-
-### Risk 2: Integration tests flaky
-**Mitigation:**
-- Use deterministic fixtures (no random data)
-- Reset mocks between tests
-- Use in-memory mocks (no external services)
-- Clear call logs after each test
-
-### Risk 3: Linter false positives
-**Mitigation:**
-- Start with conservative rules (only obvious errors)
-- Make lint warnings non-blocking
-- Add escape hatch: `// lint-ignore: always-true`
-- Iterate based on user feedback
+### Nice to Have (Defer to Sprint 3)
+- Rule linter (moved to Sprint 3)
+- Async dry-run with SSE (moved to Sprint 3)
+- Contract test migration (moved to Sprint 3)
 
 ---
 
-## Sprint 2 Timeline
+## 📊 Success Metrics
 
-| Day | Tasks | Deliverable |
-|-----|-------|-------------|
-| 1 | Linter implementation | linter.js + 20 unit tests |
-| 2 | Dry-run core (stratified sampling) | impactAnalyzer.js enhanced |
-| 3 | Supabase/OpenAI mocks + fixtures | Test doubles complete |
-| 4 | Integration tests (suggest/apply/reject) | 20+ integration tests |
-| 5 | Integration tests (LLM/impact) + contract migration | 10+ tests, contract passing |
-| 6 | CI enhancements + perf baseline check | CI fully green |
-| 7 | Documentation + Sprint 2 wrap-up | SPRINT2_COMPLETE.md |
-
----
-
-## Success Metrics
-
-**Before Sprint 2:**
+### Before Sprint 2:
 - Tests: 77 (unit + fuzz + perf + golden)
 - Coverage: ~85%
 - CI time: ~1 minute
 - Features: Validators, policy gate, schema
 
-**After Sprint 2:**
-- Tests: 107+ (adds integration + contract)
-- Coverage: ≥80% (with new dry-run/linter code)
-- CI time: ~2 minutes (adds integration tests)
-- Features: + Dry-run, linter, mocked integration tests
+### After Sprint 2:
+- Tests: 92+ (adds integration)
+- Coverage: ≥80% (with dry-run/overlap code)
+- CI time: ~2 minutes
+- Features: + Dry-run, overlap analysis, UI integration
 
-**Key Outcomes:**
-- ✅ Dry-run feature complete and tested
-- ✅ Linter catches logical errors
-- ✅ Full integration test coverage with mocks
-- ✅ No dependency on real Supabase/OpenAI in CI
-- ✅ Performance benchmarks established
+### Key Outcomes:
+- ✅ Analysts see impact BEFORE deploying
+- ✅ Overlap warnings prevent redundant rules
+- ✅ Fast CI with mocks (no API costs)
+- ✅ Performance validated (50k < 2s)
 
 ---
 
-## Next Sprint Preview (Sprint 3)
+## 🗓 Sprint 2 Timeline
 
-- Async dry-run with SSE (for large samples)
-- Overlap analysis (compare with existing rules)
-- UI enhancements (linter warnings, impact dashboard)
-- E2E tests (full flow with UI automation)
-- Rule versioning and rollback
+| Phase | Hours | Deliverable |
+|-------|-------|-------------|
+| 2A: Database | 4-6h | Projection table + indexes + backfill |
+| 2B: Dry-Run | 8-12h | Sampler + engine + evaluator + PII stripper |
+| 2C: Overlap | 4-6h | Jaccard analyzer + top 5 logic |
+| 2D: APIs | 6-8h | /api/rules/dryrun + audit logging |
+| 2E: UI | 6-8h | Dry-run modal + charts + tables |
+| 2F: Tests | 10-12h | Fixtures + 15 integration tests |
+| 2G: CI + Docs | 4-6h | CI updates + SPRINT2_COMPLETE.md |
+| **Total** | **42-58h** | **5-7 days** |
+
+---
+
+## 🚨 Risk Mitigation
+
+### Risk 1: Dry-run too slow (> 2s)
+**Mitigation:**
+- Use projection table (no JSON parsing)
+- Add compound indexes on queried columns
+- Run EXPLAIN ANALYZE, optimize queries
+- Cache rule compilation results
+
+### Risk 2: Integration tests flaky
+**Mitigation:**
+- Use deterministic fixtures (seeded data)
+- Reset mocks between tests
+- In-memory mocks only (no external services)
+- Env-key guard prevents accidental real calls
+
+### Risk 3: Overlap analysis inaccurate
+**Mitigation:**
+- Validate Jaccard calculation with unit tests
+- Use sufficient sample size (10k+ transactions)
+- Visual inspection of top overlaps
+- Iterate based on analyst feedback
+
+---
+
+## 📋 Deferred to Sprint 3
+
+These were originally in Sprint 2 but moved to reduce scope:
+
+1. **Rule Linter** (logical error detection)
+   - Defer to Sprint 3 for focused implementation
+   - Sprint 2 focuses on dry-run + overlap (higher business value)
+
+2. **Async Dry-Run with SSE**
+   - Sprint 2: synchronous (< 2s is fast enough)
+   - Sprint 3: async for 100k+ samples
+
+3. **Contract Test Migration**
+   - Sprint 2: adds integration tests with mocks
+   - Sprint 3: migrate existing contract tests
 
 ---
 
 **Sprint 2 Status:** 📋 Ready to start
-**Prerequisites:** ✅ Sprint 1 complete (77/77 tests passing)
-**Estimated effort:** 5-7 days (40-56 hours)
+**Next Step:** Begin Phase 2A (Database Migrations)
+**Estimated completion:** 5-7 days from start

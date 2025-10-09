@@ -9,9 +9,9 @@
 | Phase | Sprint | Duration | Key Deliverable | Business Value |
 |-------|--------|----------|-----------------|----------------|
 | ✅ **Foundation** | Sprint 1 | 5 days | Testing infrastructure (77/77 tests) | Safety net for AI development |
-| 🚧 **Core Features** | Sprint 2 | 5-7 days | Dry-run + Integration tests | Impact analysis before deployment |
-| 📋 **Scale & UX** | Sprint 3 | 5-7 days | Async processing + UI polish | Handle production volume |
-| 🎯 **Intelligence** | Sprint 4 | 7-10 days | Overlap analysis + Rule optimization | Reduce redundancy, improve accuracy |
+| 🚧 **Core Features** | Sprint 2 | 5-7 days | Dry-run + Overlap analysis + UI | Impact analysis before deployment |
+| 📋 **Scale & UX** | Sprint 3 | 5-7 days | Async processing + Rule linter | Handle production volume |
+| 🎯 **Intelligence** | Sprint 4 | 7-10 days | Rule optimization + Performance tracking | Improve accuracy, reduce redundancy |
 | 🚀 **Production** | Sprint 5 | 5-7 days | Auth + RBAC + Monitoring | Production-ready deployment |
 
 **Total Time:** 27-36 days (5-7 weeks)
@@ -46,11 +46,30 @@
 
 ---
 
-## Sprint 2: Core Features 🚧 NEXT (5-7 days)
+## Sprint 2: Dry-Run + Overlap Analysis 🚧 NEXT (5-7 days)
 
-**Goal:** Implement dry-run impact analysis and complete integration test coverage
+**Goal:** Implement dry-run impact analysis, overlap detection, and UI integration with comprehensive testing
 
-### A. Dry-Run Implementation (High Priority)
+**Structure:** 7 phases (2A-2G) | **Duration:** 42-58 hours (5-7 days)
+
+### A. Database Migrations (Phase 2A - High Priority)
+
+**Features:**
+1. **transactions_proj table** - Lean projection without JSON parsing
+2. **Optimized indexes** - For fast queries (decision, timestamp, device, etc.)
+3. **Data backfill script** - Populate from existing transactions table
+
+**Business Value:**
+- **Performance:** 50k queries < 2s (vs 10-15s with JSON parsing)
+- **Scalability:** Supports 500k+ row dry-runs
+- **Maintainability:** Clean schema for analytics
+
+**Acceptance Criteria:**
+- [ ] transactions_proj table created with indexes
+- [ ] Backfill script populates from existing data
+- [ ] Migration tested on staging environment
+
+### B. Dry-Run Implementation (Phase 2B - High Priority)
 
 **Features:**
 1. **Stratified Sampling** (5 strata: recent, weekend, flagged, high-value, random)
@@ -69,53 +88,110 @@
 - [ ] Change examples show PII-stripped transaction details
 - [ ] Integration tests cover all dry-run logic
 
-### B. Rule Linter (Medium Priority)
+### C. Overlap Analysis (Phase 2C - High Priority)
 
-**Detects:**
-- Always-true/false conditions
-- Contradictions (amount > 5k AND amount < 1k)
-- Redundant conditions
-- Overly complex rules (>7 conditions)
+**Features:**
+1. **Jaccard Similarity** - Compare proposed rule with existing rules
+2. **Redundancy Detection** - Warn if >70% overlap with existing rule
+3. **Overlap Examples** - Show transactions matched by both rules
 
 **Business Value:**
-- **Error Prevention:** Catches logical errors before LLM sends to production
-- **Rule Quality:** Ensures rules are meaningful and actionable
-- **User Guidance:** Suggestions help analysts write better rules
+- **Prevent Duplication:** Catch redundant rules before deployment
+- **Rule Optimization:** Suggest merging similar rules
+- **Clarity:** Analysts understand rule interactions
 
 **Acceptance Criteria:**
-- [ ] Linter detects 5+ error types
-- [ ] 20+ unit tests cover linter logic
-- [ ] Warnings shown in UI (non-blocking)
+- [ ] Overlap analysis returns Jaccard scores for all existing rules
+- [ ] Warns when overlap >70%
+- [ ] Shows intersection examples
+- [ ] Integration tests verify accuracy
 
-### C. Integration Tests + Mocks (High Priority)
+### D. API Endpoints (Phase 2D - High Priority)
+
+**Endpoints:**
+1. **POST /api/rules/dryrun** - Run impact analysis
+2. **GET /api/rules/:id/overlap** - Check overlap with existing rules
+3. **Integration with /api/rules/suggest** - Auto-run dry-run after generation
+
+**Business Value:**
+- **Unified Workflow:** Dry-run integrated into rule creation flow
+- **API-First:** External tools can leverage dry-run
+- **Testing:** Clear contract for integration tests
+
+**Acceptance Criteria:**
+- [ ] All endpoints return correct response structure
+- [ ] Error handling for edge cases (empty sample, invalid rule)
+- [ ] Contract tests verify API shape
+
+### E. UI Integration (Phase 2E - Medium Priority)
+
+**Features:**
+1. **Dry-Run Modal** - Show impact analysis in popup
+2. **Overlap Warning Badge** - Visual indicator when overlap detected
+3. **Chart.js Visualizations** - Baseline vs proposed comparison charts
+
+**Business Value:**
+- **Usability:** Analysts see impact without leaving page
+- **Visual Clarity:** Charts make deltas easier to understand
+- **Trust:** Visual feedback builds confidence in AI suggestions
+
+**Acceptance Criteria:**
+- [ ] Dry-run modal displays metrics and examples
+- [ ] Overlap badge shows when Jaccard >70%
+- [ ] Charts render correctly on all browsers
+
+### F. Test Doubles + Integration Tests (Phase 2F - High Priority)
 
 **Deliverables:**
-- Supabase mock (in-memory query engine)
-- OpenAI mock (fixture-based responses)
-- 30+ integration tests (suggest, apply, reject, LLM, impact)
-- Contract tests migrated to use mocks
+- Minimal Supabase mock (fixture-based, no full query engine)
+- Minimal OpenAI mock (fixture-based responses)
+- 15+ integration tests (dry-run, overlap, API endpoints)
+- Env-key guard prevents real API calls in CI
 
 **Business Value:**
 - **CI Speed:** No external API calls = fast, reliable CI
 - **Development Velocity:** Developers can test without credentials
-- **Cost Savings:** No LLM API costs in CI
+- **Cost Savings:** No LLM/DB API costs in CI
 
 **Acceptance Criteria:**
 - [ ] All integration tests pass with mocks
-- [ ] Contract tests pass with mocks (remove from skip)
-- [ ] CI fully green (107+ tests)
+- [ ] Env-key guard blocks real credentials in pure tests
+- [ ] CI fully green (92+ tests)
+
+### G. CI + Documentation (Phase 2G - Low Priority)
+
+**Deliverables:**
+1. **CI enhancements** - Add dry-run performance benchmarks
+2. **Documentation** - Update README with dry-run usage
+3. **Examples** - Add code examples for API usage
+
+**Business Value:**
+- **Knowledge Transfer:** Future developers understand dry-run flow
+- **Performance Tracking:** Catch regressions early
+- **Adoption:** Clear docs enable external integrations
+
+**Acceptance Criteria:**
+- [ ] CI includes dry-run benchmark tests
+- [ ] Documentation covers all new endpoints
+- [ ] Code examples provided for common use cases
 
 ### Sprint 2 Success Metrics
-- Tests: 107+ (adds integration + contract)
-- Coverage: ≥80%
-- Features: Dry-run, linter, full integration coverage
-- CI time: ~2 minutes
+- Tests: 77 → 92+ (adds 15 integration tests)
+- Coverage: ≥80% lines, ≥70% branches
+- Features: Dry-run, overlap analysis, UI integration, database migrations
+- Performance: 50k dry-run < 2s
+- CI time: ~2-3 minutes (no real API calls)
+
+### Deferred to Sprint 3
+- Rule linter (moved to Sprint 3 for scope management)
+- Async dry-run with SSE (moved to Sprint 3 for performance needs)
+- Contract test migration (moved to Sprint 3)
 
 ---
 
 ## Sprint 3: Scale & UX (5-7 days)
 
-**Goal:** Handle production volume and polish UI for analyst workflows
+**Goal:** Handle production volume, add rule linter, and polish UI for analyst workflows
 
 ### A. Async Dry-Run with SSE (High Priority)
 
@@ -137,24 +213,27 @@
 - [ ] SSE stream sends progress updates every 1s
 - [ ] Job queue handles failures gracefully (retry logic)
 
-### B. Overlap Analysis (Medium Priority)
+### B. Rule Linter (Medium Priority)
 
-**Feature:** Compare proposed rule with existing rules using Jaccard similarity
+**Feature:** Static analysis to catch logical errors in rules before deployment
 
-**Metrics:**
-- Overlap score (0-100%, higher = more redundant)
-- Overlap examples (transactions matched by both rules)
-- Recommendation: "90% overlap with rule #42 - consider merging"
+**Detects:**
+- Always-true/false conditions (e.g., `amount > 0` when amount is always positive)
+- Contradictions (e.g., `amount > 5000 AND amount < 1000`)
+- Redundant conditions (e.g., `device == "mobile" AND device == "mobile"`)
+- Overly complex rules (>7 conditions)
+- Negation-only rules (should use positive assertions when possible)
 
 **Business Value:**
-- **Redundancy Detection:** Prevents duplicate rules
-- **Rule Optimization:** Suggests merging similar rules
-- **Clarity:** Analysts understand how rules interact
+- **Error Prevention:** Catches logical errors before LLM sends to production
+- **Rule Quality:** Ensures rules are meaningful and actionable
+- **User Guidance:** Suggestions help analysts write better rules
 
 **Acceptance Criteria:**
-- [ ] Overlap analysis compares new rule with all existing rules
-- [ ] Returns overlap score + examples
-- [ ] UI displays overlap warnings
+- [ ] Linter detects 5+ error types
+- [ ] 20+ unit tests cover linter logic
+- [ ] Warnings shown in UI (non-blocking)
+- [ ] Integration with /api/rules/suggest endpoint
 
 ### C. UI Enhancements (Medium Priority)
 
@@ -202,9 +281,9 @@
 - [ ] E2E tests run in CI (headless mode)
 
 ### Sprint 3 Success Metrics
-- Features: Async dry-run, overlap analysis, UI enhancements
-- Tests: 120+ (adds E2E)
-- Performance: 100k dry-run < 10s
+- Features: Async dry-run, rule linter, UI enhancements, E2E tests
+- Tests: 120+ (adds 20 linter tests + E2E tests)
+- Performance: 100k async dry-run < 10s
 - UX: Analysts can complete full workflow in < 3 minutes
 
 ---
@@ -611,9 +690,9 @@ This roadmap delivers a production-ready AI-assisted fraud detection system in *
 
 **Key Milestones:**
 - ✅ Sprint 1: Foundation (testing infrastructure)
-- 🚧 Sprint 2: Core features (dry-run + linter)
-- 📋 Sprint 3: Scale & UX (async + overlap)
-- 🎯 Sprint 4: Intelligence (performance tracking)
+- 🚧 Sprint 2: Core features (dry-run + overlap + UI)
+- 📋 Sprint 3: Scale & UX (async + linter)
+- 🎯 Sprint 4: Intelligence (performance tracking + optimization)
 - 🚀 Sprint 5: Production (auth + monitoring)
 
 **Expected Outcomes:**
