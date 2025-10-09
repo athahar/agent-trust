@@ -8,7 +8,7 @@ const router = express.Router();
 router.get('/:userId/summary', async (req, res) => {
   const { userId } = req.params;
   const { data, error } = await supabase
-    .from('atd_users')
+    .from('atd_profiles')
     .select('user_id, name, risk_profile')
     .eq('user_id', userId)
     .single();

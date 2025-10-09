@@ -35,7 +35,7 @@ let userPool = [], userMap = {};
     }
 
     const { data: users, error } = await supabase
-      .from('atd_users')
+      .from('atd_profiles')
       .select('user_id, name');
 
     if (error) {
@@ -73,7 +73,7 @@ app.get('/stream', (req, res) => {
 
       const { data, error } = await supabase
         .from('atd_transactions')
-        .select('*, users(name)')
+        .select('*')
         .eq('txn_id', txn.txn_id)
         .single();
 
@@ -81,7 +81,7 @@ app.get('/stream', (req, res) => {
 
       const enrichedTxn = {
         ...data,
-        user_name: data.users?.name ?? 'N/A'
+        user_name: userMap[data.user_id] ?? 'N/A'
       };
 
       res.write(`data: ${JSON.stringify(enrichedTxn)}\n\n`);
@@ -136,7 +136,7 @@ app.post('/api/eval', async (req, res) => {
 
     const { data, error } = await supabase
       .from('atd_transactions')
-      .select('*, users(name)')
+      .select('*')
       .eq('txn_id', txn.txn_id)
       .single();
 
@@ -144,7 +144,7 @@ app.post('/api/eval', async (req, res) => {
 
     res.json({
       ...data,
-      user_name: data.users?.name ?? 'N/A'
+      user_name: userMap[data.user_id] ?? 'N/A'
     });
 
   } catch (err) {

@@ -1,5 +1,5 @@
--- Add description column to fraud_rules if it doesn't exist
-ALTER TABLE fraud_rules 
+-- Add description column to atd_fraud_rules if it doesn't exist
+ALTER TABLE atd_fraud_rules
 ADD COLUMN IF NOT EXISTS description TEXT;
 
 -- Create fraud_rules_view
@@ -9,6 +9,6 @@ SELECT
     creator.name as created_by_name,
     approver.name as approved_by_name
 FROM atd_fraud_rules fr
-LEFT JOIN atd_users creator ON fr.created_by = creator.user_id
-LEFT JOIN atd_users approver ON fr.approved_by = approver.user_id
+LEFT JOIN atd_profiles creator ON fr.created_by = creator.user_id
+LEFT JOIN atd_profiles approver ON fr.approved_by = approver.user_id
 ORDER BY fr.priority; 

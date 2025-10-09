@@ -29,7 +29,7 @@ async function seed() {
     name,
     risk_profile: faker.number.int({ min: 20, max: 80 })
   }));
-  await supabase.from('atd_users').upsert(users);
+  await supabase.from('atd_profiles').upsert(users);
 
   // 2) Seed one transaction per merchant per user
   const BATCH_SIZE = 200;
