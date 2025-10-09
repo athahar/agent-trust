@@ -1,6 +1,10 @@
 {
-  "version": "1.0.0",
-  "last_updated": "2025-01-08",
+  "version": "1.1.0",
+  "last_updated": "2025-01-09",
+  "changelog": {
+    "1.1.0": "Sprint 1 completion: added is_first_transaction, normalized agent_id/partner enums",
+    "1.0.0": "Initial catalog with 17 fields"
+  },
   "description": "Single source of truth for all transaction fields available in fraud rules",
 
   "features": [

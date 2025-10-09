@@ -195,10 +195,19 @@ test('perf: validator handles 10k rulesets < 500ms', () => {
 ]
 ```
 
+**Golden Dataset (5000 rows)**:
+- **Generator:** `tests/fixtures/build_golden.mjs`
+- **Seed:** `"agent-trust-golden-v1"` (SHA-256 hashed xorshift RNG)
+- **Immutability:** Same seed = same dataset (deterministic)
+- **Regenerate:** `npm run test:golden:gen` (only if seed/logic changes)
+- **Distribution:** Stratified by amount ($0-5, $5-5k, $5k+), device, intent, hour
+- **Risk pockets:** Seeded high-risk patterns (mobile+off-hours+high-value, first-txn, flagged)
+
 **Why important**:
 - Prevents regressions (if test breaks, behavior changed)
 - Serves as documentation (shows what's valid vs invalid)
 - Future-proof (when you add dry-run, add match count assertions)
+- Determinism ensures reproducible CI results
 
 ---
 

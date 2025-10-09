@@ -19,8 +19,49 @@
       font-family: 'Helvetica Neue', Arial, sans-serif;
       background: var(--bg);
       color: var(--text);
+      padding-top: 60px; /* Adjust based on header height */
     }
-    .container { max-width: 1000px; margin: 0 auto; padding: 1rem; }
+
+    /* Standardized Header Styling */
+    header {
+      background: var(--text); /* Dark background */
+      padding: 0.75rem 1rem; /* Padding top/bottom and sides */
+      display: flex;
+      justify-content: space-between; /* Space out logo and nav */
+      align-items: center;
+      color: #fff; /* White text for header */
+      
+      /* Fixed header styles */
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      z-index: 100; /* Ensure it's above other content */
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 1.5rem;
+      color: #fff; /* White color for the logo text */
+    }
+
+    header nav a {
+      margin-left: 1rem; /* Space between nav links */
+      color: #fff; /* White color for nav links */
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    header nav a:hover {
+      text-decoration: underline;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 1rem;
+    }
+
     h1 { font-size: 1.75rem; margin-bottom: 1rem; }
     .overview {
       background: var(--card-bg);
@@ -64,9 +105,8 @@
     a { color: var(--primary); text-decoration: none; }
     a:hover { text-decoration: underline; }
     .flagged, .review { color: var(--orange); font-weight: 600; }
-    .declined, .disputed { color: var(--red); font-weight: 600; }
+    .declined, .disputed, .blocked { color: var(--red); font-weight: 600; }
 
-    /* Generic modal */
     .modal {
       display: none;
       position: fixed; top: 0; left: 0;
@@ -78,7 +118,7 @@
     .modal-content {
         background: var(--card-bg);
         width: 100%;
-        max-width: 90vw;    /* ← was 800px or 1000px */
+        max-width: 90vw;
         max-height: 90%;
         display: flex;
         flex-direction: column;
@@ -127,8 +167,16 @@
   </style>
 </head>
 <body>
+  <header>
+    <h1>VeriMesh</h1>
+    <nav>
+      <a href="index.html">Dashboard</a>
+      <a href="user.html">User Lookup</a>
+      <a href="rules.html">Rules</a>
+    </nav>
+  </header>
   <div class="container">
-    <h1 id="page-title">User Detail</h1>
+    <h1 id="page-title" style="display: none;">User Detail</h1>
     <div class="overview">
       <strong>ID:</strong> <span id="uid"></span><br>
       <strong>Name:</strong> <span id="uname"></span><br>
@@ -148,15 +196,14 @@
     <table>
       <thead>
         <tr>
-          <th>Partner</th><th>Txns</th><th>Total $</th><th>Score</th>
-          <th>Flagged</th><th>Review</th><th>Declined</th><th>Disputed</th><th>All</th>
+          <th>Partner</th><th>Txns</th><th>Total $</th><th>Risk Score (Avg)</th>
+          <th>Reviewed</th><th>Blocked</th><th>Disputed</th><th>All</th>
         </tr>
       </thead>
       <tbody id="stats"></tbody>
     </table>
   </div>
 
-  <!-- Agent‐details modal -->
   <div id="modal" class="modal">
     <div class="modal-content">
       <div class="modal-header">
@@ -167,7 +214,6 @@
     </div>
   </div>
 
-  <!-- Simulation modal -->
   <div id="simModal" class="modal">
     <div class="modal-content">
       <div class="modal-header">
@@ -175,46 +221,8 @@
         <span id="simClose" class="close">× Close</span>
       </div>
       <div id="simBody">
-        <label>
-          Status:
-          <select id="simStatus">
-            <option value="good">Success</option>
-            <option value="flagged">Flagged</option>
-            <option value="review">To Be Reviewed</option>
-            <option value="declined">Declined</option>
-            <option value="disputed">Disputed</option>
-          </select>
-        </label>
-        <label>
-          Partner:
-          <select id="simPartner">
-            <option value="">Any</option>
-            <option>Ramp</option><option>Payman</option><option>Nekuda</option>
-            <option>New Gen</option><option>Scale</option><option>OpenAI</option>
-            <option>Anthropic</option><option>Samsung</option><option>Stripe</option>
-            <option>Shopify</option><option>Etsy</option><option>Booking.com</option>
-          </select>
-        </label>
-        <label>
-          Seller:
-          <select id="simSeller">
-            <option value="">Any</option>
-            <option>Best Buy</option><option>Canva</option><option>Khan Academy</option>
-            <option>Amazon</option><option>Walmart</option>
-          </select>
-        </label>
-        <label>
-          Delegation:
-          <select id="simDirect">
-            <option value="delegated">Delegated</option>
-            <option value="direct">Direct</option>
-          </select>
-        </label>
-        <label>
-          Delegated Hours Ago:
-          <input type="number" id="simHours" value="2" min="0" step="0.5"/>
-        </label>
-        <button id="doSim" class="primary">Run Simulation</button>
+        <!-- You can customize your simulation UI here -->
+        Sim panel placeholder
       </div>
     </div>
   </div>
@@ -233,30 +241,21 @@
       const openSim    = document.getElementById('openSim');
       const simModal   = document.getElementById('simModal');
       const simClose   = document.getElementById('simClose');
-      const simTitle   = document.getElementById('simTitle');
-      const simBody    = document.getElementById('simBody');
       const modal      = document.getElementById('modal');
       const modalBody  = document.getElementById('modal-body');
       const backBtn    = document.getElementById('back');
       const closeBtn   = document.getElementById('close');
 
+      // Create containers for list and fingerprint views
+      const transactionListContainer = document.createElement('div');
+      const fingerprintDetailsContainer = document.createElement('div');
+      modalBody.appendChild(transactionListContainer);
+      modalBody.appendChild(fingerprintDetailsContainer);
+      fingerprintDetailsContainer.style.display = 'none'; // Hide initially
+
       if (!userId) {
         container.innerHTML = '<p>Please include <code>?userId=…</code> in the URL.</p>';
         return;
-      }
-
-      let userName = '';
-      let currentPeriod = 30;
-      const originalSimHTML = simBody.innerHTML;
-
-      function formatDuration(ms) {
-        const sec  = Math.floor(ms/1000);
-        if (sec<60) return 'just now';
-        const min  = Math.floor(sec/60); if (min<60) return `${min}m ago`;
-        const hr   = Math.floor(min/60); if (hr<24) return `${hr}h ${min%60}m ago`;
-        const days = Math.floor(hr/24);  if (days<30) return `${days}d ${hr%24}h ago`;
-        const mo   = Math.floor(days/30);if (mo<12) return `${mo}mo ${days%30}d ago`;
-        const yr   = Math.floor(mo/12);  return `${yr}y ${mo%12}mo ago`;
       }
 
       async function loadSummary() {
@@ -266,29 +265,26 @@
         uidEl.textContent     = j.user_id;
         nameEl.textContent    = j.name;
         trustEl.textContent   = j.risk_profile;
-        userName               = j.name;
-        simTitle.textContent   = `Simulate a Transaction for User: ${j.name}`;
       }
 
       async function loadStats(days) {
-        statsT.innerHTML = '<tr><td colspan="9">Loading…</td></tr>';
+        statsT.innerHTML = '<tr><td colspan="8">Loading…</td></tr>';
         const res  = await fetch(`/user/${userId}/agents?period=${days}`);
         const data = await res.json();
-        console.log('⎘ agent_summary returned:', data);
         statsT.innerHTML = data.map(a => `
           <tr>
             <td>${a.partner}</td>
             <td>${a.txn_count}</td>
             <td>$${a.total_amount.toFixed(2)}</td>
             <td>${a.agent_score}</td>
-            <td class="flagged">${a.flagged_count||''}</td>
-            <td class="review">${a.to_review_count||''}</td>
-            <td class="declined">${a.declined_count||''}</td>
-            <td class="disputed">${a.disputed_count||''}</td>
-            <td><a href="#" data-agent="${a.agent_id}" data-partner="${a.partner}">View</a></td>
+            <td class="review">${a.to_review_count || ''}</td>
+            <td class="blocked">${a.declined_count || ''}</td>
+            <td class="disputed">${a.disputed_count || ''}</td>
+            <td><a href="#" class="view-link" data-agent="${a.agent_id}" data-partner="${a.partner}">View</a></td>
           </tr>
         `).join('');
-        document.querySelectorAll('a[data-agent]').forEach(link => {
+
+        document.querySelectorAll('.view-link').forEach(link => {
           link.addEventListener('click', e => {
             e.preventDefault();
             showAgentTxns(link.dataset.agent, link.dataset.partner);
@@ -296,159 +292,115 @@
         });
       }
 
-      async function showAgentTxns(agentId, partner) {
-        // log for debugging
-        console.log('→ showAgentTxns for', agentId, partner);
+      function renderTxnRow(t) {
+        const fe = t.fraud_engine_output || {};
+        const rules = fe.matched_rule_descriptions?.join(', ') || '';
+        // Try to get risk_score and risk_decision from top level first, then from fraud_engine_output
+        const riskScoreDisplay = t.risk_score ?? fe.risk_score ?? '—';
+        const riskDecisionDisplay = t.risk_decision ?? fe.risk_decision ?? '—';
 
-        // initial header + table shell
-        modalBody.innerHTML = `
-            <h3>User: ${userName}, Partner: ${partner}</h3>
-            <table class="fingerprint-table">
-            <thead>
-                <tr>
-                <th>Date</th>
-                <th>Txn ID</th>
-                <th>$</th>
-                <th>Seller</th>
-                <th>Intent</th>
-                <th>Flagged</th>
-                <th>Review</th>
-                <th>Declined</th>
-                <th>Disputed</th>
-                <th>Delegated</th>
-                <th>Details</th>
-                </tr>
-            </thead>
-            <tbody id="txn-list"></tbody>
-            </table>`;
-
-        const listEl = document.getElementById('txn-list');
-
-        // fetch ALL transactions for this user
-        const resp = await fetch(`/simulate/${userId}`);
-        const allTxns = await resp.json();
-        console.log('⎘ allTxns:', allTxns);
-
-        // filter to just this agent
-        const txns = allTxns.filter(t => t.agent_id === agentId);
-        console.log(`⎘ filtered to ${agentId}:`, txns);
-
-        // render each row
-        listEl.innerHTML = txns.map(t => {
-            // show full date+time in first column
-            const fullDate = new Date(t.timestamp).toLocaleString();
-            // delegated delta
-            const ago = formatDuration(new Date(t.timestamp) - new Date(t.delegation_time));
-            return `
-            <tr>
-                <td>${fullDate}</td>
-                <td>${t.txn_id.slice(0,8)}</td>
-                <td>$${t.amount.toFixed(2)}</td>
-                <td>${t.seller_name || '—'}</td>
-                <td>${t.intent.replace('_',' ')}</td>
-                <td class="flagged">${t.flagged?1:''}</td>
-                <td class="review">${t.to_review?1:''}</td>
-                <td class="declined">${t.declined?1:''}</td>
-                <td class="disputed">${t.disputed?1:''}</td>
-                <td>${ago}</td>
-                <td><a href="#" data-txn="${t.txn_id}">Details</a></td>
-            </tr>`;
-        }).join('');
-
-        // hook up the “Details” links
-        listEl.querySelectorAll('a[data-txn]').forEach(link => {
-            link.addEventListener('click', async e => {
-            e.preventDefault();
-            const txnId = link.dataset.txn;
-            const txns2 = await (await fetch(`/simulate/${userId}`)).json();
-            const t     = txns2.find(x=>x.txn_id===txnId);
-            const ago   = formatDuration(new Date(t.timestamp) - new Date(t.delegation_time));
-            modalBody.innerHTML = `
-                <h3>Fingerprint for Txn ${txnId.slice(0,8)}</h3>
-                <ul>
-                <li><strong>Seller:</strong> ${t.seller_name}</li>
-                <li><strong>URL:</strong> <a href="${t.seller_url}" target="_blank">${t.seller_url}</a></li>
-                <li><strong>Date & Time:</strong> ${new Date(t.timestamp).toLocaleString()}</li>
-                <li><strong>Delegated At:</strong> ${new Date(t.delegation_time).toLocaleString()}</li>
-                <li><strong>Delegated?</strong> ${t.delegated ? 'Yes' : 'No'}</li>
-                <li><strong>Delegated Delta:</strong> ${ago}</li>
-                <li><strong>Device:</strong> ${t.device}</li>
-                </ul>
-                <p style="margin-top:1rem;"><a class="back" href="#">← Back to list</a></p>`;
-            modalBody.querySelector('.back').onclick = () => showAgentTxns(agentId, partner);
-            });
-        });
-
-        // hide modal on back
-        backBtn.onclick = () => {
-            modal.style.display = 'none';
-            loadStats(currentPeriod);
-        };
-
-        modal.style.display = 'flex';
-        }
-
-      openSim.addEventListener('click', () => {
-        simBody.innerHTML = originalSimHTML;
-        simModal.style.display = 'flex';
-        bindSimForm();
-      });
-      simClose.addEventListener('click', () => simModal.style.display = 'none');
-
-      function bindSimForm() {
-        const runBtn = document.getElementById('doSim');
-        runBtn.addEventListener('click', async () => {
-          const status  = document.getElementById('simStatus').value;
-          const partner = document.getElementById('simPartner').value;
-          const seller  = document.getElementById('simSeller').value;
-          const direct  = document.getElementById('simDirect').value;
-          const hours   = document.getElementById('simHours').value;
-          const q = new URLSearchParams({
-            status, delegated: direct, delegated_hours: hours
-          });
-          if (partner) q.set('partner', partner);
-          if (seller)  q.set('seller', seller);
-
-          const res = await fetch(`/simulate/${userId}/one?${q}`, { method:'POST' });
-          const txn = await res.json();
-
-          simBody.innerHTML = `
-            <h3>Simulated Transaction</h3>
-            <ul>
-              <li><strong>Partner:</strong> ${txn.partner}</li>
-              <li><strong>Seller:</strong> ${txn.seller_name}</li>
-              <li><strong>Intent:</strong> ${txn.intent.replace('_',' ')}</li>
-              <li><strong>Amount:</strong> $${txn.amount.toFixed(2)}</li>
-              <li><strong>Delegated:</strong> ${txn.delegated?'Yes':'No'}</li>
-              <li><strong>Status:</strong> ${txn.status==='good'?'Success':txn.status}</li>
-            </ul>
-            <button class="primary" id="closeAfter">Close</button>`;
-          document.getElementById('closeAfter').addEventListener('click', () => {
-            simModal.style.display = 'none';
-          });
-
-          loadSummary();
-          loadStats(currentPeriod);
-        }, { once: true });
+        return `
+          <tr>
+            <td>${new Date(t.timestamp).toLocaleString()}</td>
+            <td>${t.txn_id.slice(0, 8)}</td>
+            <td>$${(t.amount || 0).toFixed(2)}</td>
+            <td>${t.seller_name}</td>
+            <td>${t.intent}</td>
+            <td>${typeof riskScoreDisplay === 'number' ? riskScoreDisplay : '—'}</td> <!-- Ensure it's a number for display -->
+            <td>${riskDecisionDisplay}</td>
+            <td title="${rules}">${rules ? '✔️' : ''}</td>
+            <td>${t.disputed ? '✔️' : ''}</td>
+            <td><a href="#" class="detail-link" data-txn="${t.txn_id}">Details</a></td>
+          </tr>
+        `;
       }
 
-      tabs.forEach(btn => btn.addEventListener('click', () => {
-        tabs.forEach(x => x.classList.remove('active'));
-        btn.classList.add('active');
-        currentPeriod = Number(btn.dataset.period);
-        loadStats(currentPeriod);
-      }));
+      function renderFingerprintDetails(t) {
+        const fe = t.fraud_engine_output || {};
+        // Try to get risk_score and risk_decision from top level first, then from fraud_engine_output
+        const riskScoreDisplay = t.risk_score ?? fe.risk_score ?? '—';
+        const riskDecisionDisplay = t.risk_decision ?? fe.risk_decision ?? '—';
 
-      new EventSource('/stream').addEventListener('message', e => {
-        const t = JSON.parse(e.data);
-        if (t.user_id === userId) {
-          loadSummary();
-          loadStats(currentPeriod);
+        return `
+          <h3>Transaction Fingerprint</h3>
+          <ul>
+            <li><strong>Txn ID:</strong> ${t.txn_id}</li>
+            <li><strong>Partner:</strong> ${t.partner}</li>
+            <li><strong>Amount:</strong> $${(t.amount || 0).toFixed(2)}</li>
+            <li><strong>Intent:</strong> ${t.intent}</li>
+            <li><strong>Risk Score:</strong> ${typeof riskScoreDisplay === 'number' ? riskScoreDisplay : '—'}</li> <!-- Ensure it's a number for display -->
+            <li><strong>Risk Decision:</strong> ${riskDecisionDisplay}</li>
+            <li><strong>Rules:</strong> ${fe.matched_rule_descriptions?.join(', ') || '—'}</li>
+            <li><strong>Tags:</strong> ${fe.risk_tags?.join(', ') || '—'}</li>
+          </ul>
+          <pre>${JSON.stringify(fe, null, 2)}</pre>
+        `;
+      }
+
+      async function showAgentTxns(agentId, partner) {
+        modal.style.display = 'flex';
+        backBtn.style.display = 'inline'; // Show the header back button
+        closeBtn.style.display = 'inline'; // Show the header close button
+
+        // Hide fingerprint details and show list
+        fingerprintDetailsContainer.style.display = 'none';
+        transactionListContainer.style.display = 'block';
+
+        const res = await fetch(`/user/${userId}/agent/${agentId}/transactions`);
+        const data = await res.json();
+        const txns = data;
+        transactionListContainer.innerHTML = `
+          <h3>Transactions by ${partner}</h3>
+          <table class="fingerprint-table">
+            <thead>
+              <tr><th>Date</th><th>ID</th><th>Amount</th><th>Seller</th><th>Intent</th><th>Risk Score</th><th>Risk Decision</th><th>Triggered Rules</th><th>Disputed</th><th></th></tr>
+            </thead>
+            <tbody>${txns.map(renderTxnRow).join('')}</tbody>
+          </table>
+        `;
+
+        document.querySelectorAll('.detail-link').forEach(link => {
+          link.addEventListener('click', e => {
+            e.preventDefault();
+            const txn = txns.find(t => t.txn_id === link.dataset.txn);
+            
+            // Hide list and show fingerprint details
+            transactionListContainer.style.display = 'none';
+            fingerprintDetailsContainer.style.display = 'block';
+
+            fingerprintDetailsContainer.innerHTML = renderFingerprintDetails(txn);
+            backBtn.style.display = 'inline'; // Ensure back button is visible
+          });
+        });
+      }
+
+      tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+          tabs.forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          loadStats(tab.dataset.period);
+        });
+      });
+
+      backBtn.addEventListener('click', () => {
+        // If fingerprint details are visible, go back to the list
+        if (fingerprintDetailsContainer.style.display !== 'none') {
+          fingerprintDetailsContainer.style.display = 'none';
+          transactionListContainer.style.display = 'block';
+          backBtn.style.display = 'inline'; // Keep back button visible
+        } else {
+          // Otherwise, close the modal (original behavior)
+          modal.style.display = 'none';
         }
       });
 
+      closeBtn.addEventListener('click', () => modal.style.display = 'none');
+      simClose.addEventListener('click', () => simModal.style.display = 'none');
+      openSim.addEventListener('click', () => simModal.style.display = 'flex');
+
+      // Initial data load
       loadSummary();
-      loadStats(currentPeriod);
+      loadStats(30);
     });
   </script>
 </body>

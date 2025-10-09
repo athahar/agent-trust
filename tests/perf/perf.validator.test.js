@@ -4,9 +4,15 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'fs';
 import { RuleValidator } from '../../src/lib/ruleValidator.js';
 import { validateRuleStructure } from '../../src/lib/ruleSchema.js';
 import { policyGate } from '../../src/lib/policyGate.js';
+
+// Load and display feature catalog version
+const catalogPath = new URL('../../src/lib/featureCatalog.json', import.meta.url);
+const catalog = JSON.parse(readFileSync(catalogPath, 'utf-8'));
+console.log(`\n📋 Feature Catalog: v${catalog.version} (updated ${catalog.last_updated})`);
 
 // ========================================
 // SECTION 1: Validator Performance

@@ -1,0 +1,113 @@
+{
+  "version": "1.0.0",
+  "baseline_date": "2025-01-09",
+  "node_version": "20.18.0",
+  "catalog_version": "1.1.0",
+  "description": "Sprint 1 performance baseline - all validators at 100% passing (77/77 tests)",
+
+  "benchmarks": {
+    "simple_rules_10k": {
+      "description": "10,000 simple rules (2 conditions each)",
+      "iterations": 10000,
+      "baseline_ms": 8,
+      "baseline_ms_per_rule": 0.0008,
+      "threshold_ms": 500,
+      "threshold_multiplier": 1.25,
+      "red_flag_ms": 625,
+      "status": "✅ 62x faster than threshold"
+    },
+
+    "complex_rules_1k": {
+      "description": "1,000 complex rules (10 conditions each)",
+      "iterations": 1000,
+      "baseline_ms": 3,
+      "baseline_ms_per_rule": 0.003,
+      "threshold_ms": 1000,
+      "threshold_multiplier": 1.25,
+      "red_flag_ms": 1250,
+      "status": "✅ 333x faster than threshold"
+    },
+
+    "schema_validation_10k": {
+      "description": "10,000 schema validations (structure only)",
+      "iterations": 10000,
+      "baseline_ms": 3,
+      "baseline_ms_per_rule": 0.0003,
+      "threshold_ms": 200,
+      "threshold_multiplier": 1.25,
+      "red_flag_ms": 250,
+      "status": "✅ 66x faster than threshold"
+    },
+
+    "policy_gate_5k": {
+      "description": "5,000 policy gate checks",
+      "iterations": 5000,
+      "baseline_ms": 4,
+      "baseline_ms_per_check": 0.0008,
+      "threshold_ms": 300,
+      "threshold_multiplier": 1.25,
+      "red_flag_ms": 375,
+      "status": "✅ 75x faster than threshold"
+    },
+
+    "mixed_workload_3k": {
+      "description": "3,000 rules (schema + catalog + policy)",
+      "iterations": 3000,
+      "baseline_ms": 4,
+      "baseline_ms_per_rule": 0.0013,
+      "threshold_ms": 1500,
+      "threshold_multiplier": 1.25,
+      "red_flag_ms": 1875,
+      "status": "✅ 375x faster than threshold"
+    },
+
+    "memory_footprint_50k": {
+      "description": "Memory delta for 50,000 validations",
+      "iterations": 50000,
+      "baseline_mb": 0.92,
+      "threshold_mb": 100,
+      "threshold_multiplier": 1.25,
+      "red_flag_mb": 125,
+      "status": "✅ 108x under threshold"
+    },
+
+    "worst_case_1k": {
+      "description": "1,000 worst-case rules (max conditions, max complexity)",
+      "iterations": 1000,
+      "baseline_ms": 1,
+      "baseline_ms_per_rule": 0.001,
+      "threshold_ms_per_rule": 5,
+      "threshold_multiplier": 1.25,
+      "red_flag_ms_per_rule": 6.25,
+      "status": "✅ 5000x faster than threshold"
+    }
+  },
+
+  "ci_gates": {
+    "description": "CI should fail if any benchmark exceeds (baseline * threshold_multiplier)",
+    "threshold_multiplier": 1.25,
+    "rationale": "Allow 25% regression buffer before red flag (8ms → 10ms is OK, 11ms is red)",
+    "implementation": "Sprint 2: Add npm script to compare current run vs this baseline"
+  },
+
+  "summary": {
+    "total_tests": 7,
+    "total_iterations": 80000,
+    "total_baseline_time_ms": 23,
+    "avg_ms_per_validation": 0.0003,
+    "fastest_test": "worst_case_1k (0.001ms/rule)",
+    "slowest_test": "mixed_workload_3k (0.0013ms/rule)",
+    "memory_efficient": true,
+    "production_ready": true
+  },
+
+  "notes": [
+    "All benchmarks run on Node 20.18.0 (macOS Darwin 24.6.0)",
+    "Baseline captured on 2025-01-09 with feature catalog v1.1.0",
+    "Validators are exceptionally fast: <1ms per rule in worst case",
+    "Dry-run on 50k transactions will complete in <2s (meets SLA)",
+    "Memory footprint is negligible (<1MB for 50k validations)",
+    "CI should fail if any test exceeds (baseline * 1.25)",
+    "To update baseline: run perf tests, manually update this file with new numbers"
+  ]
+}

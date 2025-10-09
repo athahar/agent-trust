@@ -30,7 +30,8 @@ export function generateTransaction(userPool) {
     declined: false,
     disputed: false,
     to_review: false,
-    agent_scope: faker.helpers.arrayElement(['read', 'write', 'transact', 'refund', 'delete', 'cancel'])
+    agent_scope: faker.helpers.arrayElement(['read', 'write', 'transact', 'refund', 'delete', 'cancel']),
+    account_age_days: faker.number.int({ min: 0, max: 1000 })
   };
 
   // Inject specific approval scenarios
@@ -66,6 +67,10 @@ export function generateTransaction(userPool) {
     txn.amount = 25;
     txn.partner = 'Anthropic';
   }
+
+ // ✅ Ensure amount and currency are never null
+ if (txn.amount == null) txn.amount = faker.number.int({ min: 2, max: 2500 });
+ if (!txn.currency) txn.currency = 'USD';
 
   return txn;
 }

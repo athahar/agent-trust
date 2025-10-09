@@ -11,6 +11,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const OUT = path.join(__dirname, "golden.json");
+const CATALOG_PATH = path.join(__dirname, "..", "..", "src", "lib", "featureCatalog.json");
 const ROWS = 5000;
 const SEED = "agent-trust-golden-v1";
 
@@ -128,10 +129,34 @@ function makeRow(i) {
 
 function main() {
   const rows = Array.from({ length: ROWS }, (_, i) => makeRow(i));
+
+  // Load catalog metadata for reproducibility tracking
+  let catalogMeta = { version: "unknown", last_updated: "unknown" };
+  try {
+    const cat = JSON.parse(fs.readFileSync(CATALOG_PATH, "utf8"));
+    catalogMeta.version = cat.version ?? "unknown";
+    catalogMeta.last_updated = cat.last_updated ?? "unknown";
+  } catch (err) {
+    console.warn(`   ⚠️  Could not load catalog metadata: ${err.message}`);
+  }
+
+  // Wrap data with reproducibility metadata
+  const payload = {
+    __meta__: {
+      seed: SEED,
+      catalog_version: catalogMeta.version,
+      catalog_last_updated: catalogMeta.last_updated,
+      generated_at: new Date().toISOString(),
+      rows: ROWS
+    },
+    data: rows
+  };
+
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
-  fs.writeFileSync(OUT, JSON.stringify(rows, null, 0)); // Compact JSON (no indentation)
+  fs.writeFileSync(OUT, JSON.stringify(payload, null, 0)); // Compact JSON (no indentation)
+
   console.log(`✅ Generated ${ROWS} deterministic transactions → ${path.relative(process.cwd(), OUT)}`);
-  console.log(`   Seed: ${SEED} (same seed = same dataset)`);
+  console.log(`   Seed: ${SEED} | Catalog: v${catalogMeta.version} (${catalogMeta.last_updated})`);
 
   // Print distribution stats
   const stats = {

@@ -18,17 +18,39 @@
       font-family: 'Helvetica Neue', Arial, sans-serif;
       background: var(--bg);
       color: var(--text);
+      padding-top: 60px;
+    }
+    header {
+      background: var(--text);
+      padding: 0.75rem 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: #fff;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      z-index: 100;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 1.5rem;
+      color: #fff;
+    }
+    header nav a {
+      margin-left: 1rem;
+      color: #fff;
+      text-decoration: none;
+      font-weight: 500;
+    }
+    header nav a:hover {
+      text-decoration: underline;
     }
     .container {
       max-width: 1200px;
       margin: 0 auto;
       padding: 1rem;
-    }
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding-bottom: 1rem;
     }
     nav a {
       margin-right: 1rem;
@@ -37,7 +59,6 @@
       font-weight: 500;
     }
     nav a:last-child { margin-right:0; }
-    h1 { margin: 0; font-size: 1.5rem; }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -65,15 +86,15 @@
   </style>
 </head>
 <body>
+  <header>
+    <h1>VeriMesh</h1>
+    <nav>
+      <a href="index.html">Dashboard</a>
+      <a href="user.html">User Lookup</a>
+      <a href="rules.html">Rules</a>
+    </nav>
+  </header>
   <div class="container">
-    <header>
-      <h1>Live Transaction Dashboard</h1>
-      <nav>
-        <a href="index.html">Dashboard</a>
-        <a href="user.html">User Lookup</a>
-        <a href="rules.html">Rules</a>
-      </nav>
-    </header>
     <table>
       <thead>
         <tr>

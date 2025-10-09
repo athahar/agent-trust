@@ -2,6 +2,8 @@
 
 **Production-ready AI-assisted fraud rule generation with safety-first architecture**
 
+> 📋 **Sprint 1 Complete!** See [SPRINT1_COMPLETE.md](./SPRINT1_COMPLETE.md) for full test results (77/77 passing) and implementation details.
+
 ---
 
 ## Table of Contents

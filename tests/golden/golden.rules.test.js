@@ -13,6 +13,11 @@ import { policyGate } from '../../src/lib/policyGate.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Load and display feature catalog version
+const catalogPath = path.join(__dirname, '..', '..', 'src', 'lib', 'featureCatalog.json');
+const catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf-8'));
+console.log(`\n📋 Feature Catalog: v${catalog.version} (updated ${catalog.last_updated})`);
+
 // Load golden rules (fixtures are in tests/fixtures/, not tests/golden/fixtures/)
 const goldenRulesPath = path.join(__dirname, '..', 'fixtures', 'golden-rules.json');
 const goldenRules = JSON.parse(fs.readFileSync(goldenRulesPath, 'utf8'));

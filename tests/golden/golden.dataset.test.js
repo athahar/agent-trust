@@ -11,6 +11,11 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Load and display feature catalog version
+const catalogPath = path.join(__dirname, '..', '..', 'src', 'lib', 'featureCatalog.json');
+const catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf-8'));
+console.log(`\n📋 Feature Catalog: v${catalog.version} (updated ${catalog.last_updated})`);
+
 const GOLDEN_PATH = path.join(__dirname, "../fixtures/golden.json");
 const SCHEMA_PATH = path.join(__dirname, "../fixtures/golden.schema.json");
 
@@ -35,13 +40,24 @@ test("golden dataset exists (run npm run test:golden:gen first if missing)", () 
 // ========================================
 
 test("golden dataset has expected size (5000 rows)", () => {
-  const rows = JSON.parse(fs.readFileSync(GOLDEN_PATH, "utf8"));
-  assert.ok(rows.length >= 5000, `Expected >= 5000 rows, got ${rows.length}`);
+  const payload = JSON.parse(fs.readFileSync(GOLDEN_PATH, "utf8"));
+  assert.ok(payload.data, "Golden payload must contain data[]");
+  assert.ok(Array.isArray(payload.data), "payload.data must be an array");
+
+  const rows = payload.data;
+  const meta = payload.__meta__ || {};
+
+  assert.ok(rows.length >= 5000,
+    `Expected >= 5000 rows, got ${rows.length} (seed=${meta.seed}, catalog=${meta.catalog_version})`
+  );
+
   console.log(`  ✓ Dataset size: ${rows.length.toLocaleString()} rows`);
+  console.log(`  ✓ Seed: ${meta.seed} | Catalog: v${meta.catalog_version} (${meta.catalog_last_updated})`);
 });
 
 test("golden dataset: all rows have required fields", () => {
-  const rows = JSON.parse(fs.readFileSync(GOLDEN_PATH, "utf8"));
+  const payload = JSON.parse(fs.readFileSync(GOLDEN_PATH, "utf8"));
+  const rows = payload.data;
   const sampleSize = 100; // Check first 100 rows for performance
   const sample = rows.slice(0, sampleSize);
 
@@ -57,7 +73,8 @@ test("golden dataset: all rows have required fields", () => {
 });
 
 test("golden dataset: fields have correct types", () => {
-  const rows = JSON.parse(fs.readFileSync(GOLDEN_PATH, "utf8"));
+  const payload = JSON.parse(fs.readFileSync(GOLDEN_PATH, "utf8"));
+  const rows = payload.data;
   const sample = rows.slice(0, 100);
 
   for (const row of sample) {
@@ -75,7 +92,8 @@ test("golden dataset: fields have correct types", () => {
 });
 
 test("golden dataset: enum fields have valid values", () => {
-  const rows = JSON.parse(fs.readFileSync(GOLDEN_PATH, "utf8"));
+  const payload = JSON.parse(fs.readFileSync(GOLDEN_PATH, "utf8"));
+  const rows = payload.data;
   const sample = rows.slice(0, 100);
 
   for (const row of sample) {
@@ -99,7 +117,8 @@ test("golden dataset: enum fields have valid values", () => {
 // ========================================
 
 test("golden dataset: distribution check (devices)", () => {
-  const rows = JSON.parse(fs.readFileSync(GOLDEN_PATH, "utf8"));
+  const payload = JSON.parse(fs.readFileSync(GOLDEN_PATH, "utf8"));
+  const rows = payload.data;
   const devices = new Set(rows.map(r => r.device));
 
   assert.equal(devices.size, 3, "Should include all 3 devices (web, mobile, tablet)");
@@ -107,7 +126,8 @@ test("golden dataset: distribution check (devices)", () => {
 });
 
 test("golden dataset: distribution check (intents)", () => {
-  const rows = JSON.parse(fs.readFileSync(GOLDEN_PATH, "utf8"));
+  const payload = JSON.parse(fs.readFileSync(GOLDEN_PATH, "utf8"));
+  const rows = payload.data;
   const intents = new Set(rows.map(r => r.intent));
 
   assert.ok(intents.size >= 3, "Should include at least 3 intents");
@@ -115,7 +135,8 @@ test("golden dataset: distribution check (intents)", () => {
 });
 
 test("golden dataset: distribution check (amount stratification)", () => {
-  const rows = JSON.parse(fs.readFileSync(GOLDEN_PATH, "utf8"));
+  const payload = JSON.parse(fs.readFileSync(GOLDEN_PATH, "utf8"));
+  const rows = payload.data;
 
   const micro = rows.filter(r => r.amount < 5).length;
   const normal = rows.filter(r => r.amount >= 5 && r.amount <= 5000).length;
@@ -136,7 +157,8 @@ test("golden dataset: distribution check (amount stratification)", () => {
 // ========================================
 
 test("golden dataset: seeded risk pockets exist", () => {
-  const rows = JSON.parse(fs.readFileSync(GOLDEN_PATH, "utf8"));
+  const payload = JSON.parse(fs.readFileSync(GOLDEN_PATH, "utf8"));
+  const rows = payload.data;
 
   const mobileOffHoursHigh = rows.filter(r =>
     r.device === "mobile" &&
@@ -162,7 +184,8 @@ test("golden dataset: seeded risk pockets exist", () => {
 });
 
 test("golden dataset: fraud_engine_output structure valid", () => {
-  const rows = JSON.parse(fs.readFileSync(GOLDEN_PATH, "utf8"));
+  const payload = JSON.parse(fs.readFileSync(GOLDEN_PATH, "utf8"));
+  const rows = payload.data;
   const sample = rows.slice(0, 50);
 
   for (const row of sample) {
@@ -182,7 +205,9 @@ test("golden dataset: is deterministic (same seed = same data)", () => {
   // This test verifies that running build_golden.mjs multiple times
   // produces the exact same dataset (critical for reproducible tests)
 
-  const rows = JSON.parse(fs.readFileSync(GOLDEN_PATH, "utf8"));
+  const payload = JSON.parse(fs.readFileSync(GOLDEN_PATH, "utf8"));
+  const rows = payload.data;
+  const meta = payload.__meta__ || {};
 
   // Check first row has expected txn_id
   assert.equal(rows[0].txn_id, "tx_00000", "First txn_id should be tx_00000");
@@ -190,7 +215,7 @@ test("golden dataset: is deterministic (same seed = same data)", () => {
   // Check last row has expected txn_id
   assert.equal(rows[rows.length - 1].txn_id, `tx_${(rows.length - 1).toString().padStart(5, "0")}`, "Last txn_id should match pattern");
 
-  console.log(`  ✓ Dataset is deterministic (txn_id sequence matches seed)`);
+  console.log(`  ✓ Dataset is deterministic (seed=${meta.seed}, catalog=v${meta.catalog_version})`);
 });
 
 console.log('\n✅ All golden dataset tests passed');

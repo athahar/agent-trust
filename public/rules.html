@@ -5,7 +5,43 @@
   <title>Fraud Rules Dashboard</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
-    body { padding: 20px; }
+    body { 
+      padding: 20px; /* Existing padding */
+      padding-top: 80px; /* Add padding for fixed header, adjust as needed */
+    }
+
+    /* Standardized Header Styling */
+    header {
+      background: #1f2937; /* Dark background, using hex for consistency */
+      padding: 0.75rem 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: #fff;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      z-index: 100;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 1.5rem;
+      color: #fff;
+    }
+
+    header nav a {
+      margin-left: 1rem;
+      color: #fff;
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    header nav a:hover {
+      text-decoration: underline;
+    }
+
     .modal-label { font-weight: bold; }
     .filter-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
     .search-select { width: 200px; margin-right: 10px; }
@@ -16,7 +52,24 @@
   </style>
 </head>
 <body>
-  <h2>Fraud Rule Management</h2>
+  <header>
+    <h1>VeriMesh</h1>
+    <nav>
+      <a href="index.html">Dashboard</a>
+      <a href="user.html">User Lookup</a>
+      <a href="rules.html">Rules</a>
+    </nav>
+  </header>
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Fraud Rule Management</h2>
+    <button class="btn btn-primary" id="aiSuggestBtn">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-magic" viewBox="0 0 16 16">
+        <path d="M9.5 2.672a.5.5 0 1 0 1 0V.843a.5.5 0 0 0-1 0v1.829Zm4.5.035A.5.5 0 0 0 13.293 2L12 3.293a.5.5 0 1 0 .707.707L14 2.707ZM7.293 4A.5.5 0 1 0 8 3.293L6.707 2A.5.5 0 0 0 6 2.707L7.293 4Zm-.621 2.5a.5.5 0 1 0 0-1H4.843a.5.5 0 1 0 0 1h1.829Zm8.485 0a.5.5 0 1 0 0-1h-1.829a.5.5 0 0 0 0 1h1.829ZM13.293 10A.5.5 0 1 0 14 9.293L12.707 8a.5.5 0 1 0-.707.707L13.293 10ZM9.5 11.157a.5.5 0 0 0 1 0V9.328a.5.5 0 0 0-1 0v1.829Zm1.854-5.097a.5.5 0 0 0 0-.706l-.708-.708a.5.5 0 0 0-.707 0L8.646 5.94a.5.5 0 0 0 0 .707l.708.708a.5.5 0 0 0 .707 0l1.293-1.293Zm-3 3a.5.5 0 0 0 0-.706l-.708-.708a.5.5 0 0 0-.707 0L.646 13.94a.5.5 0 0 0 0 .707l.708.708a.5.5 0 0 0 .707 0L8.354 9.06Z"/>
+      </svg>
+      AI Suggest
+    </button>
+  </div>
 
   <div class="filter-row">
     <div>
@@ -81,6 +134,216 @@
             <div class="mb-2"><strong>Matches:</strong> <span id="modalMatchCount"></span> in last 90 days</div>
             <div id="modalTxnList" class="table-responsive"></div>
             <a href="#" id="viewAllLink" class="d-block mt-2 small text-primary">View all matching transactions</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Suggest Modal -->
+  <div class="modal fade" id="aiSuggestModal" tabindex="-1" aria-labelledby="aiSuggestModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="aiSuggestModalLabel">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-magic me-2" viewBox="0 0 16 16">
+              <path d="M9.5 2.672a.5.5 0 1 0 1 0V.843a.5.5 0 0 0-1 0v1.829Zm4.5.035A.5.5 0 0 0 13.293 2L12 3.293a.5.5 0 1 0 .707.707L14 2.707ZM7.293 4A.5.5 0 1 0 8 3.293L6.707 2A.5.5 0 0 0 6 2.707L7.293 4Zm-.621 2.5a.5.5 0 1 0 0-1H4.843a.5.5 0 1 0 0 1h1.829Zm8.485 0a.5.5 0 1 0 0-1h-1.829a.5.5 0 0 0 0 1h1.829ZM13.293 10A.5.5 0 1 0 14 9.293L12.707 8a.5.5 0 1 0-.707.707L13.293 10ZM9.5 11.157a.5.5 0 0 0 1 0V9.328a.5.5 0 0 0-1 0v1.829Zm1.854-5.097a.5.5 0 0 0 0-.706l-.708-.708a.5.5 0 0 0-.707 0L8.646 5.94a.5.5 0 0 0 0 .707l.708.708a.5.5 0 0 0 .707 0l1.293-1.293Zm-3 3a.5.5 0 0 0 0-.706l-.708-.708a.5.5 0 0 0-.707 0L.646 13.94a.5.5 0 0 0 0 .707l.708.708a.5.5 0 0 0 .707 0L8.354 9.06Z"/>
+            </svg>
+            AI Rule Suggestion
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <!-- Step 1: Instruction Input -->
+          <div id="instructionStep" class="suggestion-step">
+            <h6 class="fw-bold mb-3">Describe the rule you want to create</h6>
+            <div class="alert alert-info">
+              <strong>Examples:</strong>
+              <ul class="mb-0 mt-2">
+                <li>"Review mobile transactions over $10k outside business hours"</li>
+                <li>"Block first-time transactions over $50k"</li>
+                <li>"Flag high-value transactions from new accounts on weekends"</li>
+              </ul>
+            </div>
+            <textarea id="instructionInput" class="form-control" rows="4" placeholder="Enter your natural language instruction..."></textarea>
+            <div class="mt-3 d-flex justify-content-end">
+              <button id="generateBtn" class="btn btn-primary">
+                <span id="generateBtnText">Generate Rule</span>
+                <span id="generateSpinner" class="spinner-border spinner-border-sm ms-2 d-none" role="status"></span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Step 2: Review Generated Rule -->
+          <div id="reviewStep" class="suggestion-step d-none">
+            <!-- Error Display -->
+            <div id="errorAlert" class="alert alert-danger d-none">
+              <strong>Error:</strong> <span id="errorMessage"></span>
+            </div>
+
+            <!-- Warning Display -->
+            <div id="warningAlert" class="alert alert-warning d-none">
+              <strong>Warnings:</strong>
+              <ul id="warningList" class="mb-0"></ul>
+            </div>
+
+            <!-- Rule Preview -->
+            <div class="card mb-3">
+              <div class="card-header bg-light">
+                <h6 class="mb-0">Generated Rule</h6>
+              </div>
+              <div class="card-body">
+                <div class="mb-2"><strong>Name:</strong> <span id="generatedRuleName"></span></div>
+                <div class="mb-2"><strong>Description:</strong> <span id="generatedDescription" class="text-muted fst-italic"></span></div>
+                <div class="mb-2"><strong>Decision:</strong> <span id="generatedDecision" class="badge"></span></div>
+                <div class="mb-2">
+                  <strong>Conditions:</strong>
+                  <ul id="generatedConditions" class="mt-2"></ul>
+                </div>
+              </div>
+            </div>
+
+            <!-- Impact Analysis -->
+            <div class="card mb-3">
+              <div class="card-header bg-light">
+                <h6 class="mb-0">Impact Analysis</h6>
+              </div>
+              <div class="card-body">
+                <div class="row mb-3">
+                  <div class="col-md-4">
+                    <div class="text-center">
+                      <div class="text-muted small">Sample Size</div>
+                      <div class="fs-4 fw-bold" id="impactSampleSize">-</div>
+                    </div>
+                  </div>
+                  <div class="col-md-4">
+                    <div class="text-center">
+                      <div class="text-muted small">Matches</div>
+                      <div class="fs-4 fw-bold" id="impactMatches">-</div>
+                    </div>
+                  </div>
+                  <div class="col-md-4">
+                    <div class="text-center">
+                      <div class="text-muted small">Match Rate</div>
+                      <div class="fs-4 fw-bold" id="impactMatchRate">-</div>
+                    </div>
+                  </div>
+                </div>
+
+                <h6 class="fw-bold mt-4 mb-3">Decision Rate Changes</h6>
+                <table class="table table-sm">
+                  <thead>
+                    <tr>
+                      <th>Decision</th>
+                      <th>Baseline</th>
+                      <th>Proposed</th>
+                      <th>Delta</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Block</td>
+                      <td id="baselineBlock">-</td>
+                      <td id="proposedBlock">-</td>
+                      <td id="deltaBlock" class="fw-bold">-</td>
+                    </tr>
+                    <tr>
+                      <td>Review</td>
+                      <td id="baselineReview">-</td>
+                      <td id="proposedReview">-</td>
+                      <td id="deltaReview" class="fw-bold">-</td>
+                    </tr>
+                    <tr>
+                      <td>Allow</td>
+                      <td id="baselineAllow">-</td>
+                      <td id="proposedAllow">-</td>
+                      <td id="deltaAllow" class="fw-bold">-</td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <div class="alert alert-secondary mt-3">
+                  <strong>False Positive Risk:</strong> <span id="fpRisk" class="badge">-</span>
+                </div>
+
+                <!-- Change Examples -->
+                <h6 class="fw-bold mt-4 mb-3">Change Examples (Top 10)</h6>
+                <div id="changeExamplesTable" class="table-responsive">
+                  <table class="table table-sm table-hover">
+                    <thead>
+                      <tr>
+                        <th>Amount</th>
+                        <th>Device</th>
+                        <th>Agent</th>
+                        <th>Baseline</th>
+                        <th>→</th>
+                        <th>Proposed</th>
+                        <th>Flagged</th>
+                      </tr>
+                    </thead>
+                    <tbody id="changeExamplesBody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="d-flex justify-content-between">
+              <button id="retryBtn" class="btn btn-outline-secondary">Retry</button>
+              <div>
+                <button id="discardBtn" class="btn btn-outline-danger me-2">Discard</button>
+                <button id="approveBtn" class="btn btn-success">
+                  Approve & Apply
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 3: Approval -->
+          <div id="approvalStep" class="suggestion-step d-none">
+            <div class="alert alert-warning">
+              <strong>Two-Person Rule:</strong> You cannot approve your own suggestions. Another analyst must review and approve this rule.
+            </div>
+            <div class="mb-3">
+              <label for="approverInput" class="form-label">Your Email (Approver)</label>
+              <input type="email" class="form-control" id="approverInput" placeholder="approver@example.com">
+            </div>
+            <div class="mb-3">
+              <label for="approvalNotesInput" class="form-label">Approval Notes (min 10 characters)</label>
+              <textarea class="form-control" id="approvalNotesInput" rows="3" placeholder="Reviewed impact analysis, FP risk acceptable..."></textarea>
+            </div>
+            <div class="mb-3">
+              <label for="expectedImpactInput" class="form-label">Expected Impact Summary</label>
+              <textarea class="form-control" id="expectedImpactInput" rows="2" placeholder="Will block 120 additional transactions per day (+2.3%)"></textarea>
+            </div>
+            <div class="mb-3 form-check">
+              <input type="checkbox" class="form-check-input" id="acknowledgeImpactCheckbox">
+              <label class="form-check-label" for="acknowledgeImpactCheckbox">
+                I acknowledge the impact analysis and approve this rule for production
+              </label>
+            </div>
+            <div class="d-flex justify-content-between">
+              <button id="backToReviewBtn" class="btn btn-outline-secondary">Back</button>
+              <button id="submitApprovalBtn" class="btn btn-success">Submit Approval</button>
+            </div>
+          </div>
+
+          <!-- Step 4: Success -->
+          <div id="successStep" class="suggestion-step d-none">
+            <div class="alert alert-success">
+              <h5 class="alert-heading">✓ Rule Successfully Applied!</h5>
+              <p class="mb-0">The rule has been created and is now active in production.</p>
+            </div>
+            <div class="card">
+              <div class="card-body">
+                <div class="mb-2"><strong>Rule ID:</strong> <span id="successRuleId"></span></div>
+                <div class="mb-2"><strong>Rule Name:</strong> <span id="successRuleName"></span></div>
+                <div class="mb-2"><strong>Status:</strong> <span class="badge bg-success">Enabled</span></div>
+              </div>
+            </div>
+            <div class="mt-3 d-flex justify-content-end">
+              <button id="closeSuccessBtn" class="btn btn-primary">Close</button>
+            </div>
           </div>
         </div>
       </div>
@@ -279,6 +542,270 @@
       const rules = await fetchRules();
       renderRules(rules);
     });
+
+    // ========================================
+    // AI SUGGEST FUNCTIONALITY
+    // ========================================
+
+    const aiSuggestModal = new bootstrap.Modal(document.getElementById('aiSuggestModal'));
+    let currentSuggestion = null;
+
+    // Open AI Suggest modal
+    document.getElementById('aiSuggestBtn').addEventListener('click', () => {
+      resetSuggestModal();
+      aiSuggestModal.show();
+    });
+
+    // Generate rule from instruction
+    document.getElementById('generateBtn').addEventListener('click', async () => {
+      const instruction = document.getElementById('instructionInput').value.trim();
+
+      if (instruction.length < 10) {
+        alert('Please enter an instruction of at least 10 characters');
+        return;
+      }
+
+      // Show loading state
+      document.getElementById('generateBtnText').textContent = 'Generating...';
+      document.getElementById('generateSpinner').classList.remove('d-none');
+      document.getElementById('generateBtn').disabled = true;
+
+      try {
+        const response = await fetch('/api/rules/suggest', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            instruction,
+            actor: 'analyst@example.com', // TODO: Get from auth
+            sample_size: 10000
+          })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          showError(data.error || 'Failed to generate rule');
+          return;
+        }
+
+        // Store suggestion
+        currentSuggestion = data;
+
+        // Display generated rule and impact
+        displayGeneratedRule(data);
+        showStep('reviewStep');
+
+      } catch (error) {
+        showError('Network error: ' + error.message);
+      } finally {
+        document.getElementById('generateBtnText').textContent = 'Generate Rule';
+        document.getElementById('generateSpinner').classList.add('d-none');
+        document.getElementById('generateBtn').disabled = false;
+      }
+    });
+
+    // Display generated rule
+    function displayGeneratedRule(data) {
+      const rule = data.proposed_rule;
+      const impact = data.impact_analysis;
+
+      // Hide errors
+      document.getElementById('errorAlert').classList.add('d-none');
+
+      // Show warnings if any
+      if (data.policy_check?.violations && data.policy_check.violations.length > 0) {
+        const warnings = data.policy_check.violations.filter(v => v.severity === 'warning');
+        if (warnings.length > 0) {
+          document.getElementById('warningAlert').classList.remove('d-none');
+          const list = document.getElementById('warningList');
+          list.innerHTML = warnings.map(w => `<li>${w.message}</li>`).join('');
+        }
+      }
+
+      // Rule details
+      document.getElementById('generatedRuleName').textContent = rule.ruleset_name;
+      document.getElementById('generatedDescription').textContent = rule.description;
+
+      const decisionBadge = document.getElementById('generatedDecision');
+      decisionBadge.textContent = rule.decision;
+      decisionBadge.className = `badge ${
+        rule.decision === 'block' ? 'bg-danger' :
+        rule.decision === 'review' ? 'bg-warning' :
+        'bg-success'
+      }`;
+
+      const conditionsList = document.getElementById('generatedConditions');
+      conditionsList.innerHTML = rule.conditions.map(c =>
+        `<li><strong>${c.field}</strong> ${c.op} <code>${JSON.stringify(c.value)}</code></li>`
+      ).join('');
+
+      // Impact analysis
+      document.getElementById('impactSampleSize').textContent = impact.sample_size.toLocaleString();
+      document.getElementById('impactMatches').textContent = impact.matches.toLocaleString();
+      document.getElementById('impactMatchRate').textContent = impact.match_rate.toFixed(2) + '%';
+
+      document.getElementById('baselineBlock').textContent = impact.baseline_rates.block;
+      document.getElementById('proposedBlock').textContent = impact.proposed_rates.block;
+      document.getElementById('deltaBlock').textContent = impact.deltas.block;
+      colorDelta('deltaBlock', impact.deltas.block);
+
+      document.getElementById('baselineReview').textContent = impact.baseline_rates.review;
+      document.getElementById('proposedReview').textContent = impact.proposed_rates.review;
+      document.getElementById('deltaReview').textContent = impact.deltas.review;
+      colorDelta('deltaReview', impact.deltas.review);
+
+      document.getElementById('baselineAllow').textContent = impact.baseline_rates.allow;
+      document.getElementById('proposedAllow').textContent = impact.proposed_rates.allow;
+      document.getElementById('deltaAllow').textContent = impact.deltas.allow;
+      colorDelta('deltaAllow', impact.deltas.allow);
+
+      // FP Risk
+      const fpRiskBadge = document.getElementById('fpRisk');
+      fpRiskBadge.textContent = impact.false_positive_risk;
+      fpRiskBadge.className = `badge ${
+        impact.false_positive_risk === 'high' ? 'bg-danger' :
+        impact.false_positive_risk === 'medium' ? 'bg-warning' :
+        'bg-success'
+      }`;
+
+      // Change examples
+      const tbody = document.getElementById('changeExamplesBody');
+      tbody.innerHTML = impact.change_examples.map(ex => `
+        <tr>
+          <td>$${ex.amount.toFixed(2)}</td>
+          <td>${ex.device}</td>
+          <td>${ex.agent_id || 'N/A'}</td>
+          <td><span class="badge bg-secondary">${ex.baseline}</span></td>
+          <td>→</td>
+          <td><span class="badge ${ex.proposed === 'block' ? 'bg-danger' : ex.proposed === 'review' ? 'bg-warning' : 'bg-success'}">${ex.proposed}</span></td>
+          <td>${ex.flagged ? '<span class="badge bg-danger">Yes</span>' : '<span class="text-muted">No</span>'}</td>
+        </tr>
+      `).join('');
+    }
+
+    function colorDelta(elementId, deltaStr) {
+      const element = document.getElementById(elementId);
+      const value = parseFloat(deltaStr);
+      if (value > 0) {
+        element.classList.add('text-danger');
+      } else if (value < 0) {
+        element.classList.add('text-success');
+      }
+    }
+
+    // Retry button
+    document.getElementById('retryBtn').addEventListener('click', () => {
+      showStep('instructionStep');
+    });
+
+    // Discard button
+    document.getElementById('discardBtn').addEventListener('click', () => {
+      if (confirm('Are you sure you want to discard this suggestion?')) {
+        aiSuggestModal.hide();
+      }
+    });
+
+    // Approve button
+    document.getElementById('approveBtn').addEventListener('click', () => {
+      showStep('approvalStep');
+    });
+
+    // Back to review button
+    document.getElementById('backToReviewBtn').addEventListener('click', () => {
+      showStep('reviewStep');
+    });
+
+    // Submit approval
+    document.getElementById('submitApprovalBtn').addEventListener('click', async () => {
+      const approver = document.getElementById('approverInput').value.trim();
+      const approvalNotes = document.getElementById('approvalNotesInput').value.trim();
+      const expectedImpact = document.getElementById('expectedImpactInput').value.trim();
+      const acknowledge = document.getElementById('acknowledgeImpactCheckbox').checked;
+
+      if (!approver || approver.length === 0) {
+        alert('Please enter your email as approver');
+        return;
+      }
+
+      if (approvalNotes.length < 10) {
+        alert('Approval notes must be at least 10 characters');
+        return;
+      }
+
+      if (expectedImpact.length < 10) {
+        alert('Expected impact summary must be at least 10 characters');
+        return;
+      }
+
+      if (!acknowledge) {
+        alert('You must acknowledge the impact analysis');
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/rules/apply', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            suggestion_id: currentSuggestion.suggestion_id,
+            approver,
+            approval_notes: approvalNotes,
+            expected_impact: expectedImpact,
+            acknowledge_impact: true
+          })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          alert('Error: ' + (data.error || 'Failed to apply rule'));
+          return;
+        }
+
+        // Show success
+        document.getElementById('successRuleId').textContent = data.rule_id;
+        document.getElementById('successRuleName').textContent = data.ruleset_name;
+        showStep('successStep');
+
+        // Reload rules table
+        setTimeout(async () => {
+          const rules = await fetchRules();
+          renderRules(rules);
+        }, 1000);
+
+      } catch (error) {
+        alert('Network error: ' + error.message);
+      }
+    });
+
+    // Close success
+    document.getElementById('closeSuccessBtn').addEventListener('click', () => {
+      aiSuggestModal.hide();
+    });
+
+    function showStep(stepId) {
+      document.querySelectorAll('.suggestion-step').forEach(s => s.classList.add('d-none'));
+      document.getElementById(stepId).classList.remove('d-none');
+    }
+
+    function showError(message) {
+      showStep('reviewStep');
+      document.getElementById('errorAlert').classList.remove('d-none');
+      document.getElementById('errorMessage').textContent = message;
+    }
+
+    function resetSuggestModal() {
+      currentSuggestion = null;
+      document.getElementById('instructionInput').value = '';
+      document.getElementById('errorAlert').classList.add('d-none');
+      document.getElementById('warningAlert').classList.add('d-none');
+      document.getElementById('approverInput').value = '';
+      document.getElementById('approvalNotesInput').value = '';
+      document.getElementById('expectedImpactInput').value = '';
+      document.getElementById('acknowledgeImpactCheckbox').checked = false;
+      showStep('instructionStep');
+    }
+
   </script>
 </body>
 </html>

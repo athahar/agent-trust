@@ -16,7 +16,7 @@ if (!supabaseUrl || !supabaseKey) {
   throw new Error('❌ Supabase URL and Service Role Key must be set in .env');
 }
 
-// Create Supabase client with debug logging
+// Create Supabase client
 const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
     autoRefreshToken: true,
@@ -26,18 +26,5 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
     schema: 'public'
   }
 });
-
-// Add debug logging for database operations
-const originalFrom = supabase.from;
-supabase.from = function(table) {
-  console.log(`🔍 Querying table: ${table}`);
-  const query = originalFrom.call(this, table);
-  const originalSelect = query.select;
-  query.select = function(...args) {
-    console.log(`📊 Select query on ${table}:`, args);
-    return originalSelect.apply(this, args);
-  };
-  return query;
-};
 
 export { supabase };

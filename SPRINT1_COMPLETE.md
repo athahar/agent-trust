@@ -142,9 +142,12 @@ Successfully built and validated a **production-ready testing infrastructure** f
 
 **Golden Dataset:**
 - 5000 rows (deterministic, seeded RNG)
+- **Seed:** `"agent-trust-golden-v1"` (defined in `tests/fixtures/build_golden.mjs:15`)
+- **Immutability:** Same seed always produces identical dataset (SHA-256 hashed xorshift RNG)
 - Spans 30 days of transactions
 - Stratified by hour/weekday/device/amount bands
 - Includes seeded "risky pockets" (mobile + high-value + off-hours)
+- **Regenerate:** `npm run test:golden:gen` (only needed if seed or generator logic changes)
 
 ---
 
