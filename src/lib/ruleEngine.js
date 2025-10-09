@@ -20,6 +20,39 @@ export async function getCachedRules() {
   return cachedRules;
 }
 
+/**
+ * Evaluate conditions array against a transaction
+ * Extracted for reuse in dry-run engine
+ *
+ * @param {Array} conditions - Array of condition objects
+ * @param {Object} txn - Transaction object
+ * @param {Object} context - Optional context object
+ * @returns {boolean} true if all conditions pass, false otherwise
+ */
+export function evaluateConditions(conditions, txn, context = {}) {
+  if (!Array.isArray(conditions)) {
+    return false;
+  }
+
+  return conditions.every(cond => {
+    const val = txn[cond.field];
+    const ctxVal = context[cond.value] || cond.value;
+
+    switch (cond.op) {
+      case '==': return val == ctxVal;
+      case '!=': return val != ctxVal;
+      case '>': return val > ctxVal;
+      case '<': return val < ctxVal;
+      case '>=': return val >= ctxVal;
+      case '<=': return val <= ctxVal;
+      case 'in': return Array.isArray(ctxVal) && ctxVal.includes(val);
+      case 'not_in': return Array.isArray(ctxVal) && !ctxVal.includes(val);
+      case 'contains': return typeof val === 'string' && val.includes(ctxVal);
+      default: return false;
+    }
+  });
+}
+
 export async function evaluateTransaction(txn) {
   const now = new Date(txn.timestamp || Date.now());
   txn.hour = now.getHours();
@@ -45,23 +78,7 @@ export async function evaluateTransaction(txn) {
       continue;
     }
 
-    const passed = conditions.every(cond => {
-      const val = txn[cond.field];
-      const ctxVal = context[cond.value] || cond.value;
-
-      switch (cond.op) {
-        case '==': return val == ctxVal;
-        case '!=': return val != ctxVal;
-        case '>': return val > ctxVal;
-        case '<': return val < ctxVal;
-        case '>=': return val >= ctxVal;
-        case '<=': return val <= ctxVal;
-        case 'in': return Array.isArray(ctxVal) && ctxVal.includes(val);
-        case 'not_in': return Array.isArray(ctxVal) && !ctxVal.includes(val);
-        case 'contains': return typeof val === 'string' && val.includes(ctxVal);
-        default: return false;
-      }
-    });
+    const passed = evaluateConditions(conditions, txn, context);
 
     if (passed) {
       console.log(

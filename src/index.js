@@ -10,6 +10,7 @@ import rulesRouter from './routes/rules.js';
 import userRouter from './routes/user.js';
 import ruleSuggestRouter from './routes/ruleSuggest.js';
 import ruleApplyRouter from './routes/ruleApply.js';
+import ruleDryRunRouter from './routes/ruleDryRun.js';
 import { runFraudCheckAndPersist } from './lib/fraudEngineWrapper.js';
 import { generateTransaction } from './generateTransaction.js';
 
@@ -22,26 +23,35 @@ app.use('/rules', rulesRouter);
 app.use('/user', userRouter);
 app.use('/api/rules', ruleSuggestRouter);
 app.use('/api/rules', ruleApplyRouter);
+app.use('/api/rules', ruleDryRunRouter);
 
 let userPool = [], userMap = {};
 
 (async () => {
   try {
+    if (!supabase) {
+      console.warn('⚠️  Skipping user load (no Supabase client - expected in tests)');
+      return;
+    }
+
     const { data: users, error } = await supabase
       .from('users')
       .select('user_id, name');
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.warn('⚠️  User load error (table may not exist):', error.message);
+      return;
+    }
 
-    users.forEach(u => {
-      userPool.push(u.user_id);
-      userMap[u.user_id] = u.name;
-    });
-
-    console.log('✅ Users loaded');
+    if (users && Array.isArray(users)) {
+      users.forEach(u => {
+        userPool.push(u.user_id);
+        userMap[u.user_id] = u.name;
+      });
+      console.log('✅ Users loaded');
+    }
   } catch (err) {
-    console.error('❌ Startup error:', err);
-    process.exit(1);
+    console.warn('⚠️  User load exception:', err.message);
   }
 })();
 
@@ -196,30 +206,33 @@ app.get('/api/rule-stats', async (req, res) => {
   res.json(data);
 });
 
-const server = app.listen(3000, () => console.log('🚀 Server running on http://localhost:3000'));
+// Only start server if running as main module (not imported for tests)
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const server = app.listen(3000, () => console.log('🚀 Server running on http://localhost:3000'));
 
-const shutdown = async (signal) => {
-  console.log(`\n${signal} received. Starting graceful shutdown...`);
-  server.close(() => {
-    console.log('Server closed');
+  const shutdown = async (signal) => {
+    console.log(`\n${signal} received. Starting graceful shutdown...`);
+    server.close(() => {
+      console.log('Server closed');
+    });
+
+    setTimeout(() => {
+      console.log('Shutdown complete');
+      process.exit(0);
+    }, 1000);
+  };
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+    shutdown('UNCAUGHT_EXCEPTION');
   });
-
-  setTimeout(() => {
-    console.log('Shutdown complete');
-    process.exit(0);
-  }, 1000);
-};
-
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
-process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error);
-  shutdown('UNCAUGHT_EXCEPTION');
-});
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  shutdown('UNHANDLED_REJECTION');
-});
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    shutdown('UNHANDLED_REJECTION');
+  });
+}
 
 // Export app for testing with supertest
 export default app;
