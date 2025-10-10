@@ -4,6 +4,43 @@
 
 ---
 
+## 🚀 Current Project State
+
+**Last Updated:** 2025-01-09
+
+### ✅ Phase 2A: Database Migration - COMPLETE
+
+**What's Done:**
+- All database tables migrated to `atd_` prefix (11 tables operational)
+- 2920 transactions preserved and backfilled to projection table
+- 15 users migrated to `atd_profiles` (standalone, no FK to auth.users)
+- Original `users` table preserved (shared by other apps)
+- All code references updated (36+ patterns across 5 files)
+- Broken Supabase joins fixed (in-memory userMap approach)
+- 9 commits pushed to `origin/main`
+- All tests passing (32/32)
+
+**Documentation:**
+- `plan/PHASE_2A_COMPLETE.md` - Full migration summary
+- `plan/PHASE_2B_PLAN.md` - Next phase ready to start
+
+### 📋 Next: Phase 2B - Dry-Run Engine
+
+**When ready to continue, implement:**
+1. **Stratified Sampler** (`src/lib/sampler.js`) - 5-strata sampling for diverse dataset
+2. **Rule Evaluator** (`src/lib/ruleEvaluator.js`) - Evaluate rules against transactions
+3. **Impact Calculator** (`src/lib/impactCalculator.js`) - Baseline vs proposed comparison
+4. **PII Stripper** (`src/lib/piiStripper.js`) - Redact sensitive fields from examples
+5. **Dry-Run Engine** (`src/lib/dryRunEngine.js`) - Orchestrate all components
+
+**Performance Target:** 50k transactions < 2s (p95)
+**New Tests:** 19 tests (unit + integration)
+**Duration:** 8-12 hours (1-2 days)
+
+**Start Here:** See `plan/PHASE_2B_PLAN.md` for detailed implementation guide
+
+---
+
 ## Table of Contents
 
 - [Testing Philosophy](#testing-philosophy)
