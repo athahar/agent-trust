@@ -1,8 +1,8 @@
-# Agent Trust Demo - Project Summary
+# VeriMesh - Project Summary
 
 ## Overview
 
-**Agent Trust Demo** is a real-time sandbox environment for fraud analysts working in the emerging world of agentic commerce. It simulates a high-volume environment where transactions are executed by autonomous agents on behalf of users, allowing analysts to experiment with and test new fraud detection strategies in a realistic context.
+**VeriMesh** is a real-time sandbox environment for fraud analysts working in the emerging world of agentic commerce. It simulates a high-volume environment where transactions are executed by autonomous agents on behalf of users, allowing analysts to experiment with and test new fraud detection strategies in a realistic context.
 
 **Core Philosophy**: Instead of treating fraud detection as a black-box ML task, this system empowers users with interpretable, testable, and editable rules, providing real feedback on agent behavior and risk signals.
 
